@@ -1,0 +1,7 @@
+:{$PORT:8080} {
+	root * /srv
+	encode gzip
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	header / Cache-Control "no-cache"
+	file_server
+}

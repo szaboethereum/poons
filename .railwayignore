@@ -1,0 +1,12 @@
+# Only art/ and web/ are needed for the site build; never upload secrets.
+.env
+**/.env
+**/.env.*
+!**/.env.example
+node_modules
+**/node_modules
+contracts
+indexer
+brand
+docs
+web/dist
