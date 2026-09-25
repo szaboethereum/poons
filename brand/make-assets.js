@@ -183,6 +183,11 @@ const gold = seedFor({ Type: idxOf('Type', 'Gold'), Topper: idxOf('Topper', 'Cro
   Eyes: idxOf('Eyes', 'Sparkle'), Mouth: idxOf('Mouth', 'Smile'), Item: idxOf('Item', 'Diamond'), Smoke: idxOf('Smoke', 'Stars') });
 console.log('gold:', JSON.stringify(A.traitLabels(A.traitsFor(gold))), A.rarity(gold).tier);
 poonCanvas(gold).encode(38, path.join(out, 'poon-gold.png'));
+// A Ghost: the pale, see-through special type (Legendary), haunting a night room.
+const ghost = seedFor({ Type: idxOf('Type', 'Ghost'), Topper: idxOf('Topper', 'Bluebird'), Glasses: idxOf('Glasses', 'Round Black'),
+  Eyes: idxOf('Eyes', 'Open'), Mouth: idxOf('Mouth', 'Surprised'), Item: idxOf('Item', 'Candle'), Background: idxOf('Background', 'Night'), Smoke: idxOf('Smoke', 'Stars') });
+console.log('ghost:', JSON.stringify(A.traitLabels(A.traitsFor(ghost))), A.rarity(ghost).tier);
+poonCanvas(ghost).encode(38, path.join(out, 'poon-ghost.png'));
 pfp().encode(8, path.join(out, 'pfp.png'));
 logoWide().encode(20, path.join(out, 'logo.png'));
 cover().encode(5, path.join(out, 'cover.png'));
