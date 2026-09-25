@@ -15,6 +15,7 @@ interface PoonsArtApi {
   traitLabels(idx: number[]): Record<string, string>;
   randomSeed(): bigint;
   rarity?: (seed: bigint) => Rarity;
+  isFounder?: (seed: bigint) => boolean;
 }
 
 declare global {
@@ -74,11 +75,14 @@ export interface TraitRow { key: string; value: string; pct: number | null; spec
 export function traitsOf(seed: bigint): TraitRow[] {
   const idx = Art.traitsFor(seed);
   const labels = Art.traitLabels(idx);
-  return TRAITS.map((t, k) => {
+  const rows: TraitRow[] = TRAITS.map((t, k) => {
     const rolled = t.opts[idx[k]][0];
     const value = labels[t.key] ?? rolled;
     return { key: t.key, value, pct: value === rolled ? optionPct(t, idx[k]) : null, special: isSpecial(k, idx[k]), isType: k === TYPE_TRAIT };
   });
+  // Qualified on the bonding curve, before graduation (bit 255 of the seed).
+  if (Art.isFounder?.(seed)) rows.push({ key: 'Status', value: 'Founding Resident', pct: null, special: true, isType: false });
+  return rows;
 }
 
 /** Traits worth showing as chips: the plain (non-special) type and empty 'None' slots are left out. */

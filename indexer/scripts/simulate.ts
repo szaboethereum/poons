@@ -81,7 +81,8 @@ async function check() {
     const r = await fetch(`${api}/api/wallet/${a}`).then(r => r.json());
     const pass = r.status === SCENARIOS[i].expect;
     ok += +pass;
-    console.log(`${pass ? 'PASS' : 'FAIL'}  ${SCENARIOS[i].name.padEnd(36)} expected ${SCENARIOS[i].expect.padEnd(12)} got ${r.status}${r.tokenId ? ` (Poon #${r.tokenId})` : ''}`);
+    const founder = r.seed ? BigInt(r.seed) >> 255n === 1n : false;
+    console.log(`${pass ? 'PASS' : 'FAIL'}  ${SCENARIOS[i].name.padEnd(36)} expected ${SCENARIOS[i].expect.padEnd(12)} got ${r.status}${r.tokenId ? ` (Poon #${r.tokenId}${founder ? ', Founding Resident' : ''})` : ''}`);
   }
   console.log(`\n${ok}/${SCENARIOS.length} scenarios behave as specified`);
   process.exit(ok === SCENARIOS.length ? 0 : 1);

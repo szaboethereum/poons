@@ -12,7 +12,7 @@ contract PoonsRendererTest is Test {
     /// byte-for-byte against the JS engine.
     function test_dumpParity() public {
         vm.createDir("./out-parity", true);
-        for (uint256 i; i < 96; ++i) {
+        for (uint256 i; i < 128; ++i) {
             uint256 seed = _seed(i);
             (uint256 tier, uint256 score) = r.rarity(seed);
             vm.writeFile(string.concat("./out-parity/", LibString.toString(i), ".svg"), r.svg(seed));
@@ -23,10 +23,12 @@ contract PoonsRendererTest is Test {
         }
     }
 
-    /// Seeds 0..63 random; 64..95 force each special type (Type reads the low 16 bits).
+    /// Seeds 0..63 random; 64..95 force each special type (Type reads the low 16 bits);
+    /// 96..127 random with the Founding Resident bit set.
     function _seed(uint256 i) internal pure returns (uint256) {
-        uint256 s = uint256(keccak256(abi.encode(i)));
+        uint256 s = uint256(keccak256(abi.encode(i))) >> 1;
         if (i < 64) return s;
+        if (i >= 96) return s | (1 << 255);
         uint16[5] memory typeValues = [uint16(9851), 9901, 9936, 9966, 9991];
         return (s >> 16 << 16) | typeValues[i % 5];
     }

@@ -9,6 +9,7 @@ export function Faq({ stats }: { stats: Stats | undefined }) {
     ['Can I get more than one?', `No. It's one Poon per wallet, ever. Buying more, or buying again later, changes nothing.`],
     ['Can I sell my tokens?', `Yes, whenever you want. Selling doesn't affect your Poon, before or after it lands.`],
     ['I bought but nothing arrived. Why?', `Check your wallet above. Common reasons: no single buy was ${minBuy} or more, the tokens came in by transfer rather than a market buy, the wallet already has a Poon, or the drop is still being sent (it takes seconds).`],
+    ['What is a Founding Resident?', `If your qualifying buy happened on the Pons bonding curve, before the token graduated to a DEX, your Poon is marked as a Founding Resident: a permanent on-chain trait and a small gold star in the corner of its art.`],
     ['Can I sell or trade my Poon?', `Yes. On OpenSea a 5% creator fee is enforced (ERC721-C). Plain wallet-to-wallet transfers are free.`],
     ['Where does the art live?', `Fully on-chain. Each Poon is a 32×32 pixel image drawn by the contract from a seed, with no IPFS and no server. The same seed always gives the same Poon.`],
     [`What happens after ${max}?`, `Supply is capped at ${max}. When the last Poon drops, the airdrop ends for good.`],

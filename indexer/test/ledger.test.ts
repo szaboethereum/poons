@@ -16,7 +16,13 @@ test('a single $10+ buy queues the wallet immediately', () => {
   const l = make();
   assert.equal(l.apply([t('a', 'buy', 12)], ETH_USD), true);
   assert.equal(status(l, 'a'), 'queued');
-  assert.deepEqual(l.queue(10), ['a']);
+  assert.deepEqual(l.queue(10), [{ address: 'a', founder: false }]);
+});
+
+test('a qualifying buy on the bonding curve makes a Founding Resident', () => {
+  const l = make();
+  l.apply([{ ...t('cv', 'buy', 12), venue: 'curve' }, { ...t('dx', 'buy', 12), venue: 'pool' }], ETH_USD);
+  assert.deepEqual(l.queue(10), [{ address: 'cv', founder: true }, { address: 'dx', founder: false }]);
 });
 
 test('buys under $10 never qualify, even if they add up', () => {
@@ -35,7 +41,7 @@ test('selling or moving tokens does not affect eligibility', () => {
 test('one Poon per wallet: buying more changes nothing, minted is final', () => {
   const l = make();
   l.apply([t('d', 'buy', 20), t('d', 'buy', 500)], ETH_USD);
-  assert.deepEqual(l.queue(10), ['d']);
+  assert.deepEqual(l.queue(10).map(q => q.address), ['d']);
   l.recordDrop('d', 1, '0x01', '0xabc', 2);
   l.apply([t('d', 'buy', 50)], ETH_USD);
   assert.equal(status(l, 'd'), 'minted');
@@ -51,7 +57,7 @@ test('tokens received by transfer never qualify', () => {
 test('queue is first-come, first-served', () => {
   const l = make();
   l.apply([t('late', 'buy', 15, 200), t('early', 'buy', 15, 100)], ETH_USD);
-  assert.deepEqual(l.queue(10), ['early', 'late']);
+  assert.deepEqual(l.queue(10).map(q => q.address), ['early', 'late']);
 });
 
 test('re-scanning the same trades is a no-op', () => {

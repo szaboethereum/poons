@@ -14,8 +14,8 @@ contract OpenSeaValidatorForkTest is Test {
         address minter = address(0xB0B);
         address alice = address(0xA11CE);
         Poons p = new Poons(address(this), minter, 3333, VALIDATOR);
-        address[] memory w = new address[](1);
-        w[0] = alice;
+        Poons.Drop[] memory w = new Poons.Drop[](1);
+        w[0] = Poons.Drop(alice, true);
         vm.prank(minter);
         p.drop(w); // mint passes through
 

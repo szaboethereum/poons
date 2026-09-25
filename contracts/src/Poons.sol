@@ -34,6 +34,12 @@ interface ITransferValidator {
 contract Poons is ERC721, OwnableRoles, ICreatorToken {
     uint256 public constant MINTER_ROLE = _ROLE_0;
 
+    struct Drop {
+        address to;
+        /// Qualifying buy happened on the Pons bonding curve, before the token graduated.
+        bool founder;
+    }
+
     uint256 public immutable maxSupply;
     uint256 public totalSupply;
 
@@ -46,13 +52,17 @@ contract Poons is ERC721, OwnableRoles, ICreatorToken {
     IPoonsRenderer public renderer;
     bool public rendererLocked;
 
-    /// @notice 5% creator fee on secondary sales, paid to the contract owner.
+    /// @notice 5% creator fee on secondary sales.
     uint256 public constant ROYALTY_BPS = 500;
+    /// @notice Receives the creator fee. Starts as the owner; can later point to a treasury contract
+    ///         without giving up ownership.
+    address public royaltyReceiver;
     address private _transferValidator;
 
     event Dropped(address indexed to, uint256 indexed tokenId, uint256 seed);
     event RendererSet(address renderer);
     event RendererLocked();
+    event RoyaltyReceiverSet(address receiver);
     /// @dev EIP-4906 so marketplaces refresh art after a renderer change.
     event BatchMetadataUpdate(uint256 fromTokenId, uint256 toTokenId);
 
@@ -64,6 +74,7 @@ contract Poons is ERC721, OwnableRoles, ICreatorToken {
         _initializeOwner(owner_);
         _grantRoles(minter, MINTER_ROLE);
         maxSupply = maxSupply_;
+        royaltyReceiver = owner_;
         _transferValidator = validator;
         emit TransferValidatorUpdated(address(0), validator);
     }
@@ -78,17 +89,19 @@ contract Poons is ERC721, OwnableRoles, ICreatorToken {
 
     /// @notice Batch airdrop, one Poon per wallet. Wallets that already received one are skipped
     ///         (never reverted), so retries are safe and one stale entry can't block a batch.
-    function drop(address[] calldata wallets) external onlyRoles(MINTER_ROLE) {
+    function drop(Drop[] calldata drops) external onlyRoles(MINTER_ROLE) {
         uint256 id = totalSupply;
         uint256 cap = maxSupply;
         bytes32 entropy = blockhash(block.number - 1);
-        for (uint256 i; i < wallets.length && id < cap; ++i) {
-            address to = wallets[i];
+        for (uint256 i; i < drops.length && id < cap; ++i) {
+            address to = drops[i].to;
             if (to == address(0) || dropOf[to] != 0) continue;
             ++id;
             // Seed depends on the wallet, not on its position in the batch, so the minter cannot
-            // steer rare seeds to chosen wallets by reordering.
-            uint256 seed = uint256(keccak256(abi.encode(to, entropy)));
+            // steer rare seeds to chosen wallets by reordering. Bit 255 carries the founder flag
+            // (traits only read the low bits), so the renderer needs no extra storage.
+            uint256 seed = uint256(keccak256(abi.encode(to, entropy))) >> 1;
+            if (drops[i].founder) seed |= 1 << 255;
             seedOf[id] = seed;
             dropOf[to] = id;
             _mint(to, id);
@@ -117,9 +130,14 @@ contract Poons is ERC721, OwnableRoles, ICreatorToken {
 
     // ---------------------------------------------------------------- creator fees
 
-    /// @notice ERC2981: 5% of the sale price to the current owner.
+    /// @notice ERC2981: 5% of the sale price to the royalty receiver.
     function royaltyInfo(uint256, uint256 salePrice) external view returns (address, uint256) {
-        return (owner(), salePrice * ROYALTY_BPS / 10_000);
+        return (royaltyReceiver, salePrice * ROYALTY_BPS / 10_000);
+    }
+
+    function setRoyaltyReceiver(address receiver) external onlyOwner {
+        royaltyReceiver = receiver;
+        emit RoyaltyReceiverSet(receiver);
     }
 
     function getTransferValidator() external view returns (address) {

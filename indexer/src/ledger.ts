@@ -4,6 +4,8 @@
 //   1. A single market buy worth >= MIN_BUY_USD queues the wallet for a drop right away.
 //   2. Smaller buys never count and never add up. Tokens received by transfer never count.
 //   3. Selling or moving tokens changes nothing: people can trade freely.
+//   4. If the qualifying buy was on the bonding curve (before graduation) the wallet is a Founding
+//      Resident; the flag is passed to drop() and stored in bit 255 of the seed.
 // Every trade is still recorded (keyed by tx + wallet), so re-scans are idempotent and the history
 // can be audited.
 import { DatabaseSync } from 'node:sqlite';
@@ -12,7 +14,7 @@ import type { Trade } from './classify.ts';
 export type Status = 'none' | 'below_min' | 'queued' | 'minted';
 
 export type WalletRow = {
-  address: string; best_buy_usd6: number; qualified_at: number | null; token_id: number | null; seed: string | null;
+  address: string; best_buy_usd6: number; qualified_at: number | null; founder: number; token_id: number | null; seed: string | null;
 };
 
 export class Ledger {
@@ -34,6 +36,7 @@ export class Ledger {
         address TEXT PRIMARY KEY,
         best_buy_usd6 INTEGER NOT NULL DEFAULT 0,
         qualified_at INTEGER,        -- chain time of the first buy >= MIN_BUY_USD (= queued for the drop)
+        founder INTEGER NOT NULL DEFAULT 0, -- that buy was on the bonding curve
         token_id INTEGER,
         seed TEXT
       );
@@ -84,14 +87,18 @@ export class Ledger {
     const w = this.row(t.wallet)!;
     const best = Math.max(w.best_buy_usd6, Number(usd6));
     const qualifies = w.qualified_at === null && usd6 >= this.minBuyUsd6;
-    this.db.prepare('UPDATE wallets SET best_buy_usd6 = ?, qualified_at = COALESCE(qualified_at, ?) WHERE address = ?')
-      .run(best, qualifies ? t.time : null, t.wallet);
+    if (qualifies) {
+      this.db.prepare('UPDATE wallets SET best_buy_usd6 = ?, qualified_at = ?, founder = ? WHERE address = ?')
+        .run(best, t.time, t.venue === 'curve' ? 1 : 0, t.wallet);
+    } else {
+      this.db.prepare('UPDATE wallets SET best_buy_usd6 = ? WHERE address = ?').run(best, t.wallet);
+    }
     return qualifies;
   }
 
-  queue(limit: number): string[] {
-    return (this.db.prepare(`SELECT address FROM wallets WHERE token_id IS NULL AND qualified_at IS NOT NULL
-      ORDER BY qualified_at LIMIT ?`).all(limit) as any[]).map(r => r.address);
+  queue(limit: number): { address: string; founder: boolean }[] {
+    return (this.db.prepare(`SELECT address, founder FROM wallets WHERE token_id IS NULL AND qualified_at IS NOT NULL
+      ORDER BY qualified_at LIMIT ?`).all(limit) as any[]).map(r => ({ address: r.address, founder: r.founder === 1 }));
   }
 
   recordDrop(wallet: string, tokenId: number, seed: string, tx: string, time: number) {

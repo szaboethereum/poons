@@ -32,10 +32,10 @@ contract PoonsTest is Test {
         poons = new Poons(owner, minter, 3333, address(0));
     }
 
-    function _two(address a, address b) internal pure returns (address[] memory w) {
-        w = new address[](2);
-        w[0] = a;
-        w[1] = b;
+    function _two(address a, address b) internal pure returns (Poons.Drop[] memory w) {
+        w = new Poons.Drop[](2);
+        w[0] = Poons.Drop(a, false);
+        w[1] = Poons.Drop(b, false);
     }
 
     function test_onePerWallet() public {
@@ -64,8 +64,8 @@ contract PoonsTest is Test {
 
     function test_capIsRespected() public {
         Poons small = new Poons(owner, minter, 2, address(0));
-        address[] memory w = new address[](5);
-        for (uint160 i; i < 5; ++i) w[i] = address(i + 10);
+        Poons.Drop[] memory w = new Poons.Drop[](5);
+        for (uint160 i; i < 5; ++i) w[i] = Poons.Drop(address(i + 10), false);
         vm.prank(minter);
         small.drop(w);
         assertEq(small.totalSupply(), 2);
@@ -98,8 +98,8 @@ contract PoonsTest is Test {
     }
 
     function test_gasPer100Mints() public {
-        address[] memory w = new address[](100);
-        for (uint160 i; i < 100; ++i) w[i] = address(i + 10);
+        Poons.Drop[] memory w = new Poons.Drop[](100);
+        for (uint160 i; i < 100; ++i) w[i] = Poons.Drop(address(i + 10), true);
         vm.prank(minter);
         uint256 g = gasleft();
         poons.drop(w);
@@ -156,6 +156,25 @@ contract PoonsTest is Test {
         vm.prank(seaport);
         p.transferFrom(bob, address(0xBEEF), 2); // fee-enforcing marketplace: allowed
         assertEq(p.ownerOf(2), address(0xBEEF));
+    }
+
+    function test_founderFlagLivesInSeedBit255() public {
+        Poons.Drop[] memory w = _two(alice, bob);
+        w[0].founder = true;
+        vm.prank(minter);
+        poons.drop(w);
+        assertEq(poons.seedOf(1) >> 255, 1);
+        assertEq(poons.seedOf(2) >> 255, 0);
+    }
+
+    function test_royaltyReceiverCanMoveWithoutOwnership() public {
+        vm.expectRevert();
+        poons.setRoyaltyReceiver(address(0x7EA));
+        vm.prank(owner);
+        poons.setRoyaltyReceiver(address(0x7EA));
+        (address to,) = poons.royaltyInfo(1, 100);
+        assertEq(to, address(0x7EA));
+        assertEq(poons.owner(), owner);
     }
 
     function test_onlyOwnerSetsValidator() public {

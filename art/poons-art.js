@@ -186,6 +186,10 @@
   const TIER_MIN = [0, 306, 331, 351]; // Uncommon, Rare, Epic score floors (Common = 0)
 
   // ---------------------------------------------------------------- seed -> traits
+  // Trait k reads bits [16k, 16k+16) of the seed (low 176 bits). Bit 255 marks a Founding Resident:
+  // the wallet's qualifying buy happened on the Pons bonding curve, before the token graduated.
+  const FOUNDER_BIT = 1n << 255n;
+  const isFounder = seed => (BigInt(seed) & FOUNDER_BIT) !== 0n;
   function traitsFor(seed) {
     seed = BigInt(seed);
     return TRAITS.map((t, k) => {
@@ -334,6 +338,8 @@
     }),
     smoke_notes: shape(({ set, rect }) => { rect(25, 0, 25, 2, S.NOTE); rect(24, 2, 25, 2, S.NOTE); rect(29, 1, 29, 3, S.NOTE); rect(28, 3, 29, 3, S.NOTE); set(30, 1, S.NOTE); }),
     smoke_fire: shape(({ set, rect }) => { rect(21, 1, 24, 2, S.FIRE_A); rect(22, 0, 23, 1, S.FIRE_B); set(22, 2, S.FIRE_C); set(23, 2, S.FIRE_B); set(21, 0, S.FIRE_A); set(24, 0, S.FIRE_A); }),
+    // Founding Resident: a small gold star in the bottom-left corner (fills empty cells, like smoke)
+    badge_founder: shape(({ set }) => { [[2, 27], [1, 28], [2, 28], [3, 28], [2, 29]].forEach(([x, y]) => set(x, y, S.STAR)); set(2, 28, S.WHITE); }),
     smoke_bubbles: shape(({ set }) => {
       [[25, 1], [26, 0], [27, 1], [26, 2]].forEach(([x, y]) => set(x, y, S.SMOKE));
       [[29, 3], [30, 2], [31, 3], [30, 4]].forEach(([x, y]) => set(x, y, S.SMOKE)); set(23, 2, S.SMOKE_SH);
@@ -474,7 +480,7 @@
     TRAITS.forEach((t, k) => t.slots.forEach((s, j) => { p[s] = t.opts[idx[k]][2][j]; }));
     return p;
   }
-  function slotGrid(idx) {
+  function slotGrid(idx, founder = false) {
     const g = new Array(N * N).fill(0);
     for (const [id, dx] of plan(idx)) for (const [x, y, s] of SHAPES[SHAPE_NAMES[id]]) {
       const slot = s === S.LENS_L && dx ? S.LENS_R : s; // right lens takes the LENS_R colour
@@ -487,12 +493,13 @@
     }
     const smoke = VARIANTS[T.Smoke][idx[T.Smoke]][0];
     if (smoke !== NONE) for (const [x, y, s] of SHAPES[SHAPE_NAMES[smoke]]) if (!out[y * N + x]) out[y * N + x] = s;
+    if (founder) for (const [x, y, s] of SHAPES.badge_founder) if (!out[y * N + x]) out[y * N + x] = s;
     for (let i = 0; i < N * N; i++) if (!out[i]) out[i] = GLOW_BITS[i] ? S.GLOW : GRAD_BITS[i] ? S.BG_B : S.BG_A;
     return out;
   }
 
   function svg(seed) {
-    const idx = traitsFor(seed), g = slotGrid(idx), pal = palette(idx);
+    const idx = traitsFor(seed), g = slotGrid(idx, isFounder(seed)), pal = palette(idx);
     let body = '';
     for (let s = 1; s < SLOT_COUNT; s++) {
       let d = '';
@@ -506,13 +513,13 @@
     return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" shape-rendering="crispEdges">${body}</svg>`;
   }
 
-  // Random uint256 seed for previews (on chain the seed is keccak(wallet, tokenId, blockhash)).
-  function randomSeed() {
+  // Random seed for previews (on chain: keccak(wallet, blockhash) with bit 255 = founder flag).
+  function randomSeed(founder = false) {
     let s = 0n; for (let i = 0; i < 8; i++) s = (s << 32n) | BigInt(Math.floor(Math.random() * 4294967296));
-    return s;
+    return (s & (FOUNDER_BIT - 1n)) | (founder ? FOUNDER_BIT : 0n);
   }
 
   const api = { N, NONE, S, SLOT_NAMES, SLOT_COUNT, FIXED, TRAITS, SPECIALS, SHAPES, SHAPE_NAMES, VARIANTS, POINTS, TIERS, TIER_MIN,
-    GLOW_BITS, GRAD_BITS, traitsFor, traitLabels, rarity, plan, palette, slotGrid, svg, randomSeed };
+    GLOW_BITS, GRAD_BITS, FOUNDER_BIT, isFounder, traitsFor, traitLabels, rarity, plan, palette, slotGrid, svg, randomSeed };
   if (typeof module !== 'undefined') module.exports = api; else root.PoonsArt = api;
 })(typeof window !== 'undefined' ? window : globalThis);

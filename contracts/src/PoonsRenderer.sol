@@ -124,21 +124,9 @@ contract PoonsRenderer is IPoonsRenderer {
             }
         }
 
-        // Smoke only fills empty cells (no outline).
-        uint256 smoke = _v(D.T_SMOKE, idx, 0);
-        if (smoke != D.NONE) {
-            (uint256 a, uint256 b) = _range(smoke);
-            bytes memory sh = D.shapes();
-            for (uint256 r = a; r < b; ++r) {
-                uint256 y = uint8(sh[r * 4]);
-                uint256 x = uint8(sh[r * 4 + 1]);
-                uint256 len = uint8(sh[r * 4 + 2]);
-                bytes1 s = sh[r * 4 + 3];
-                for (uint256 j; j < len; ++j) {
-                    if (out[y * N + x + j] == 0) out[y * N + x + j] = s;
-                }
-            }
-        }
+        // Smoke and the Founding Resident badge only fill empty cells (no outline).
+        _fillEmpty(out, _v(D.T_SMOKE, idx, 0));
+        if (isFounder(seed)) _fillEmpty(out, D.BADGE_FOUNDER);
 
         bytes memory glow = D.glowBits();
         bytes memory grad = D.gradBits();
@@ -147,6 +135,11 @@ contract PoonsRenderer is IPoonsRenderer {
             uint256 slot = _bit(glow, i) ? D.SLOT_GLOW : _bit(grad, i) ? D.SLOT_BG_B : D.SLOT_BG_A;
             out[i] = bytes1(uint8(slot));
         }
+    }
+
+    /// @notice Bit 255 of the seed: the wallet qualified on the bonding curve, before graduation.
+    function isFounder(uint256 seed) public pure returns (bool) {
+        return seed >> 255 == 1;
     }
 
     function svg(uint256 seed) public pure returns (string memory) {
@@ -188,6 +181,7 @@ contract PoonsRenderer is IPoonsRenderer {
             if (bytes(value).length == 0) value = D.optionName(k, idx[k]);
             attrs.p(bytes('{"trait_type":"'), bytes(D.traitName(k)), bytes('","value":"'), bytes(value), bytes('"},'));
         }
+        if (isFounder(seed)) attrs.p(bytes('{"trait_type":"Founding Resident","value":"Yes"},'));
         attrs.p(bytes('{"trait_type":"Rarity","value":"'), bytes(_tierName(tier)), bytes('"},'));
         attrs.p(bytes('{"trait_type":"Rarity Score","display_type":"number","value":'), bytes(LibString.toString(score)), bytes("}"));
 
@@ -215,6 +209,21 @@ contract PoonsRenderer is IPoonsRenderer {
 
     function _v(uint256 k, uint8[TRAITS] memory idx, uint256 which) private pure returns (uint256) {
         return uint8(D.variants(k)[uint256(idx[k]) * 4 + which]);
+    }
+
+    function _fillEmpty(bytes memory out, uint256 shape) private pure {
+        if (shape == D.NONE) return;
+        (uint256 a, uint256 b) = _range(shape);
+        bytes memory sh = D.shapes();
+        for (uint256 r = a; r < b; ++r) {
+            uint256 y = uint8(sh[r * 4]);
+            uint256 x = uint8(sh[r * 4 + 1]);
+            uint256 len = uint8(sh[r * 4 + 2]);
+            bytes1 s = sh[r * 4 + 3];
+            for (uint256 j; j < len; ++j) {
+                if (out[y * N + x + j] == 0) out[y * N + x + j] = s;
+            }
+        }
     }
 
     function _drawOpt(bytes memory g, uint256 shape) private pure {

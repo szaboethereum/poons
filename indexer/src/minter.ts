@@ -6,7 +6,8 @@ import { randomBytes } from 'node:crypto';
 import type { Ledger } from './ledger.ts';
 
 export const POONS_ABI = [
-  { type: 'function', name: 'drop', stateMutability: 'nonpayable', inputs: [{ name: 'wallets', type: 'address[]' }], outputs: [] },
+  { type: 'function', name: 'drop', stateMutability: 'nonpayable', outputs: [],
+    inputs: [{ name: 'drops', type: 'tuple[]', components: [{ name: 'to', type: 'address' }, { name: 'founder', type: 'bool' }] }] },
   { type: 'function', name: 'dropOf', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'seedOf', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'totalSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
@@ -47,7 +48,7 @@ export class Minter {
   }
 
   async run() {
-    if (!this.dryRun) console.log(`[mint] reconciled ${await this.reconcile(this.ledger.queue(100_000))} wallet(s) already served on-chain`);
+    if (!this.dryRun) console.log(`[mint] reconciled ${await this.reconcile(this.ledger.queue(100_000).map(q => q.address))} wallet(s) already served on-chain`);
     for (;;) {
       const batch = this.soldOut ? [] : this.ledger.queue(this.maxBatch);
       if (!batch.length) {
@@ -57,9 +58,10 @@ export class Minter {
       }
       if (this.dryRun) {
         // Simulated ids/seeds so the API and frontend behave as they will on-chain.
-        for (const w of batch) {
+        for (const q of batch) {
           const id = (this.ledger.tokens(0, 1).total as number) + 1;
-          this.ledger.recordDrop(w, id, '0x' + randomBytes(32).toString('hex'), 'dry-run', Math.floor(Date.now() / 1000));
+          const seed = (BigInt('0x' + randomBytes(32).toString('hex')) >> 1n) | (q.founder ? 1n << 255n : 0n);
+          this.ledger.recordDrop(q.address, id, seedHex(seed), 'dry-run', Math.floor(Date.now() / 1000));
         }
         console.log(`[mint] DRY RUN would drop ${batch.length} Poon(s)`);
         continue;
@@ -73,7 +75,8 @@ export class Minter {
 
         const t0 = Date.now();
         const hash = await this.wallet!.writeContract({
-          address: this.poons, abi: POONS_ABI, functionName: 'drop', args: [batch as `0x${string}`[]],
+          address: this.poons, abi: POONS_ABI, functionName: 'drop',
+          args: [batch.map(q => ({ to: q.address as `0x${string}`, founder: q.founder }))],
           account: this.account!, chain: this.wallet!.chain,
         });
         const rc = await this.pub.waitForTransactionReceipt({ hash, pollingInterval: 100, timeout: 60_000 });
@@ -90,12 +93,12 @@ export class Minter {
           } catch { /* not ours */ }
         }
         // Wallets in the batch without a Dropped event were already served (or supply ran out).
-        if (minted < batch.length) await this.reconcile(batch.filter(w => this.ledger.row(w)?.token_id == null));
+        if (minted < batch.length) await this.reconcile(batch.map(q => q.address).filter(w => this.ledger.row(w)?.token_id == null));
         console.log(`[mint] ${minted} Poon(s) in ${Date.now() - t0}ms ${hash}`);
       } catch (e: any) {
         console.error('[mint]', e.shortMessage ?? e.message);
         await sleep(1500);
-        await this.reconcile(batch).catch(() => {});
+        await this.reconcile(batch.map(q => q.address)).catch(() => {});
       }
     }
   }

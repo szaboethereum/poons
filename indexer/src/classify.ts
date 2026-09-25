@@ -30,6 +30,7 @@ export type Trade = {
   time: number;
   wallet: string;
   kind: 'buy' | 'out' | 'in'; // out = sold or sent away; in = received without a market fill
+  venue?: 'curve' | 'pool';   // buys only: bonding curve (pre-graduation) or DEX pool
   tokens: bigint;
   ethWei: bigint; // for 'buy': ETH paid; for 'out': ETH value at trade/last price; 'in': 0
 };
@@ -81,12 +82,12 @@ export function classify(ctx: Ctx, logs: Log[], lastPriceE18: bigint): { trades:
     }
 
     // ETH legs. Curve events carry no token field, so match them to our transfers by amount.
-    let boughtTokens = poolOut, boughtEth = 0n, soldTokens = poolIn, soldEth = 0n;
+    let boughtTokens = poolOut, boughtEth = 0n, soldTokens = poolIn, soldEth = 0n, curveTokens = 0n;
     for (const l of txLogs) {
       if (lc(l.address) === curve && l.topics[0] === TOPIC.CurveBuy) {
         const ethIn = word(l.data, 0), out = word(l.data, 1);
         const i = fromMarket.indexOf(out);
-        if (i >= 0) { fromMarket.splice(i, 1); boughtTokens += out; boughtEth += ethIn; }
+        if (i >= 0) { fromMarket.splice(i, 1); boughtTokens += out; boughtEth += ethIn; curveTokens += out; }
       } else if (lc(l.address) === curve && l.topics[0] === TOPIC.CurveSell) {
         const tin = word(l.data, 0), ethOut = word(l.data, 1);
         const i = toMarket.indexOf(tin);
@@ -107,7 +108,8 @@ export function classify(ctx: Ctx, logs: Log[], lastPriceE18: bigint): { trades:
       const base = { tx, logIndex: first.logIndex, block: first.blockNumber, time: first.time, wallet };
       if (d > 0n) {
         if (boughtTokens > 0n && boughtEth > 0n) {
-          trades.push({ ...base, kind: 'buy', tokens: d, ethWei: (d * boughtEth) / boughtTokens });
+          trades.push({ ...base, kind: 'buy', tokens: d, ethWei: (d * boughtEth) / boughtTokens,
+            venue: curveTokens * 2n >= boughtTokens ? 'curve' : 'pool' });
         } else {
           trades.push({ ...base, kind: 'in', tokens: d, ethWei: 0n });
         }
