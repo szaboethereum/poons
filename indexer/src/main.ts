@@ -7,6 +7,7 @@ import { Watcher } from './watcher.ts';
 import { Minter } from './minter.ts';
 import { startApi } from './api.ts';
 import { countRpc } from './rpc.ts';
+import { waitForLaunch } from './launch.ts';
 
 // Per-network settings live in .env as KEY_TESTNET / KEY_MAINNET; NETWORK picks the block.
 const NETWORK = process.env.NETWORK ?? 'testnet';
@@ -60,11 +61,27 @@ for (const u of rpcs) {
   if (id !== net.id) throw new Error(`RPC ${u.replace(/\/v2\/.*/, '/v2/…')} is chain ${id}, but NETWORK=${NETWORK} expects ${net.id}`);
 }
 
-const token = env('TOKEN').toLowerCase();
+const ledger = new Ledger(env('DB', `poons-${net.id}.db`), Number(env('MIN_BUY_USD', '10')));
+const wsUrl = env('WS_URL', '');
+const apiPort = Number(env('API_PORT', '8788'));
+
+let token = env('TOKEN', '').toLowerCase();
+let startBlock = env('START_BLOCK', '');
 // The curve comes from .env on testnet (MockPonsCurve) and from the Pons factory's Launched event on mainnet.
 let curve = env('CURVE', net.curve).toLowerCase();
+// No TOKEN yet: wait for our own wallet (LAUNCHER) to launch it on Pons, then lock onto it.
+if (!token) {
+  const launcher = env('LAUNCHER', '').toLowerCase();
+  if (!launcher || !net.factory) throw new Error('set TOKEN, or LAUNCHER to wait for the Pons launch');
+  const l = await waitForLaunch(pub as any, {
+    factory: net.factory, launcher, ledger, port: apiPort, wsUrl: wsUrl || undefined,
+    fromBlock: env('LAUNCH_FROM_BLOCK', '') ? BigInt(env('LAUNCH_FROM_BLOCK')) : undefined,
+  });
+  token = l.token; curve = l.curve; startBlock = l.block.toString();
+}
+if (!startBlock) throw new Error('START_BLOCK is not set');
 if (!curve && net.factory) {
-  const start = BigInt(env('START_BLOCK'));
+  const start = BigInt(startBlock);
   const found = await pub.request({ method: 'eth_getLogs', params: [{
     address: net.factory as `0x${string}`, fromBlock: `0x${(start > 50n ? start - 50n : 0n).toString(16)}`,
     toBlock: `0x${(start + 50000n).toString(16)}`,
@@ -81,7 +98,6 @@ const v4 = net.poolManager ? {
     ['0x0000000000000000000000000000000000000000', token as `0x${string}`, 0, 200, net.hook as `0x${string}`])),
 } : undefined;
 const poons = env('POONS') as `0x${string}`;
-const ledger = new Ledger(env('DB', `poons-${net.id}.db`), Number(env('MIN_BUY_USD', '10')));
 const price = new EthUsd(process.env[`ETH_USD_${NETWORK.toUpperCase()}`]);
 await price.start();
 
@@ -99,9 +115,8 @@ const account = dryRun ? null : privateKeyToAccount(env('MINTER_KEY') as `0x${st
 const wallet = account ? createWalletClient({ chain, transport, account }) : null;
 const minter = new Minter(pub as any, wallet, account, poons, ledger, Number(env('MAX_BATCH', '120')));
 
-const wsUrl = env('WS_URL', '');
 const watcher = new Watcher(pub as any, ctx, ledger, price, {
-  startBlock: BigInt(env('START_BLOCK')),
+  startBlock: BigInt(startBlock),
   pollMs: Number(env('POLL_MS', '250')),
   idlePollMs: Number(env('IDLE_POLL_MS', wsUrl ? '5000' : '2000')),
   maxRange: BigInt(env('MAX_RANGE', '2000')),
@@ -120,7 +135,7 @@ if (wsUrl) {
   console.log('[ws] subscribed to token logs');
 }
 
-startApi(Number(env('API_PORT', '8788')), ledger, watcher, minter, {
+startApi(apiPort, ledger, watcher, minter, {
   chainId: net.id, token, poons, ponsUrl: net.pons + token, maxSupply: Number(env('MAX_SUPPLY', '3333')),
   minBuyUsd: Number(env('MIN_BUY_USD', '10')),
 });

@@ -41,6 +41,8 @@ async function get<T>(path: string, fallback: (d: Demo) => T): Promise<T> {
     offlineStore.set(true);
     throw new ApiError(0, OFFLINE_MSG);
   }
+  // 503 = the indexer is up but not serving yet (e.g. waiting for the token launch): same as offline.
+  if (res.status === 503) { offlineStore.set(true); throw new ApiError(503, OFFLINE_MSG); }
   offlineStore.set(false);
   if (!res.ok) {
     let msg = `Request failed (${res.status})`;
