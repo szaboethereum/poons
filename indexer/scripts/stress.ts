@@ -50,7 +50,7 @@ console.log(`sent ${sent} buys in ${((Date.now() - t0) / 1000).toFixed(1)}s`);
 let s: any = {};
 for (let i = 0; i < 600; i++) {
   s = await stats().catch(() => ({}));
-  if (s.soldOut || (s.minted >= Math.min(3333, qualifying) && s.queued === 0)) break;
+  if (s.soldOut || (s.minted >= Math.min(3333, qualifying + Number(process.env.PRE_DROPPED ?? 0)) && s.queued === 0)) break;
   await sleep(1000);
 }
 const secs = (Date.now() - t0) / 1000;
@@ -69,6 +69,8 @@ console.log(JSON.stringify({
   walletsHoldingOne: holders, walletsHoldingMoreThanOne: over, belowMin: s.belowMin, stillQueued: s.queued,
   rpcCalls: health.rpc?.total, watcherErrors: health.lastError,
 }, null, 2));
-const ok = Number(supply) === Math.min(3333, qualifying) && over === 0 && holders === Number(supply);
+const pre = Number(process.env.PRE_DROPPED ?? 0);
+const ok = Number(supply) === Math.min(3333, qualifying + pre) && over === 0 && holders === Number(supply) - pre
+  && s.minted === Number(supply) && s.soldOut === (Number(supply) === 3333);
 console.log(ok ? 'STRESS PASS' : 'STRESS FAIL');
 process.exit(ok ? 0 : 1);

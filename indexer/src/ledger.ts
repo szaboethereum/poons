@@ -107,6 +107,10 @@ export class Ledger {
     this.db.prepare('INSERT OR IGNORE INTO tokens VALUES (?, ?, ?, ?, ?)').run(tokenId, wallet, seed, tx, time);
   }
 
+  hasToken(tokenId: number): boolean {
+    return !!this.db.prepare('SELECT 1 FROM tokens WHERE token_id = ?').get(tokenId);
+  }
+
   dropTx(tokenId: number): string | null {
     const r = this.db.prepare('SELECT tx FROM tokens WHERE token_id = ?').get(tokenId) as any;
     return r && r.tx.startsWith('0x') && r.tx.length === 66 ? r.tx : null;

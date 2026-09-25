@@ -10,6 +10,7 @@ export const POONS_ABI = [
     inputs: [{ name: 'drops', type: 'tuple[]', components: [{ name: 'to', type: 'address' }, { name: 'founder', type: 'bool' }] }] },
   { type: 'function', name: 'dropOf', stateMutability: 'view', inputs: [{ type: 'address' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'seedOf', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'ownerOf', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'address' }] },
   { type: 'function', name: 'totalSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'maxSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'mintOpen', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
@@ -33,6 +34,8 @@ export class Minter {
   mintOpen: boolean | null = null;
   #mintCheckedAt = 0;
   #maxSupply: bigint | null = null;
+  /** On-chain totalSupply. The chain, not the ledger, decides sell-out: Poons dropped outside the indexer count too. */
+  #supply: bigint | null = null;
 
   constructor(pub: PublicClient, wallet: WalletClient | null, account: Account | null, poons: `0x${string}`,
     ledger: Ledger, maxBatch: number) {
@@ -65,6 +68,23 @@ export class Minter {
     return fixed;
   }
 
+  /** Records Poons the ledger doesn't know (e.g. dropped by hand before the indexer ran), so counts match the chain. */
+  async adopt() {
+    const supply = await this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'totalSupply' });
+    let added = 0;
+    for (let id = 1n; id <= supply; id++) {
+      if (this.ledger.hasToken(Number(id))) continue;
+      const [seed, owner] = await Promise.all([
+        this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'seedOf', args: [id] }),
+        this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'ownerOf', args: [id] }),
+      ]);
+      this.ledger.recordDrop(owner.toLowerCase(), Number(id), seedHex(seed), '0x', Math.floor(Date.now() / 1000));
+      added++;
+    }
+    this.#supply = supply;
+    return added;
+  }
+
   #watchBalance() {
     if (this.dryRun || !this.account) return;
     const tick = async () => {
@@ -80,6 +100,7 @@ export class Minter {
   async run() {
     this.#watchBalance();
     if (!this.dryRun) await this.#isOpen().catch(() => {});
+    if (!this.dryRun) console.log(`[mint] adopted ${await this.adopt()} Poon(s) minted outside the indexer`);
     if (!this.dryRun) console.log(`[mint] reconciled ${await this.reconcile(this.ledger.queue(100_000).map(q => q.address))} wallet(s) already served on-chain`);
     for (;;) {
       const batch = this.soldOut ? [] : this.ledger.queue(this.maxBatch);
@@ -105,7 +126,8 @@ export class Minter {
           continue;
         }
         this.#maxSupply ??= await this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'maxSupply' });
-        if (BigInt(this.ledger.tokens(0, 1).total) >= this.#maxSupply) { this.soldOut = true; console.log('[mint] max supply reached — minting stopped'); continue; }
+        this.#supply ??= await this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'totalSupply' });
+        if (this.#supply >= this.#maxSupply) { this.soldOut = true; console.log('[mint] max supply reached — minting stopped'); continue; }
 
         const t0 = Date.now();
         const hash = await this.wallet!.writeContract({
@@ -127,6 +149,9 @@ export class Minter {
           } catch { /* not ours */ }
         }
         // Wallets in the batch without a Dropped event were already served (or supply ran out).
+        this.#supply = minted < batch.length
+          ? await this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'totalSupply' })
+          : this.#supply + BigInt(minted);
         if (minted < batch.length) await this.reconcile(batch.map(q => q.address).filter(w => this.ledger.row(w)?.token_id == null));
         console.log(`[mint] ${minted} Poon(s) in ${Date.now() - t0}ms ${hash}`);
       } catch (e: any) {

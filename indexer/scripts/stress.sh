@@ -17,6 +17,9 @@ OUT=$(cd ../contracts && MINTER_ADDRESS=$ADDR forge script script/DeployTestnet.
 val() { echo "$OUT" | grep -E "^ *$1=" | sed 's/.*=//'; }
 export CURVE_LOCAL=$(val CURVE) TOKEN_LOCAL=$(val TOKEN) POONS_LOCAL=$(val POONS)
 cast send "$POONS_LOCAL" 'setMintOpen(bool)' true --private-key $KEY --rpc-url http://127.0.0.1:8545 >/dev/null
+# Like mainnet: one Poon dropped by hand before the indexer starts. It must be adopted, not double-counted.
+cast send "$POONS_LOCAL" 'drop((address,bool)[])' "[($ADDR,false)]" --private-key $KEY --rpc-url http://127.0.0.1:8545 >/dev/null
+export PRE_DROPPED=1
 echo "deployed: poons $POONS_LOCAL, mint open"
 
 export NETWORK=local MINTER_KEY=$KEY RPC_URLS_LOCAL=http://127.0.0.1:8545 WS_URL_LOCAL=ws://127.0.0.1:8545 \
