@@ -1,0 +1,17 @@
+{
+  "name": "poons-indexer",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "start": "node --env-file-if-exists=../.env --disable-warning=ExperimentalWarning src/main.ts",
+    "test": "node --disable-warning=ExperimentalWarning --test 'test/*.test.ts'",
+    "simulate": "node --env-file-if-exists=../.env --disable-warning=ExperimentalWarning scripts/simulate.ts"
+  },
+  "author": "",
+  "license": "ISC",
+  "type": "module",
+  "dependencies": {
+    "viem": "^2.56.9"
+  },
+  "private": true
+}

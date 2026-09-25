@@ -1,0 +1,14 @@
+node_modules/
+*.db
+*.db-*
+.env
+contracts/out/
+contracts/cache/
+contracts/out-parity/
+contracts/broadcast/
+art/_preview.html
+indexer/.sim-wallets.json
+web/dist/
+.claude/
+*.log
+art/_page.html
