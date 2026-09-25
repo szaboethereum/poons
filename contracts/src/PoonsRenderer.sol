@@ -188,7 +188,7 @@ contract PoonsRenderer is IPoonsRenderer {
         bytes memory json = abi.encodePacked(
             '{"name":"Poon #',
             LibString.toString(tokenId),
-            '","description":"Poons: one free Poon for every wallet that bought $10+ on Pons and held. 3333 max. Fully on-chain pixel art.","image":"data:image/svg+xml;base64,',
+            '","description":"Poons: one free Poon for every wallet that buys $10+ of the token on Pons in a single buy. 3333 max. Fully on-chain pixel art.","image":"data:image/svg+xml;base64,',
             Base64.encode(bytes(svg(seed))),
             '","attributes":[',
             attrs.data,

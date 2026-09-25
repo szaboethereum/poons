@@ -1,6 +1,12 @@
-// Head follower. Robinhood Chain makes ~10 blocks/s and the public RPC has no websocket, so we poll
-// eth_getLogs over [cursor+1, head] in a tight loop. A range is committed together with the cursor,
-// so restarts resume exactly where they stopped and never skip or double-count a block.
+// Head follower. A range [cursor+1, head] is committed together with the cursor, so restarts resume
+// exactly where they stopped and never skip or double-count a block.
+//
+// RPC budget (Robinhood Chain makes ~10 blocks/s, so "is there a new block?" is almost always yes):
+//   - one eth_getLogs per poll covers our token's Transfers *and* the curve's buy/sell events
+//     (the two WETH queries only exist after graduation)
+//   - adaptive polling: POLL_MS while trades are flowing, relaxing to IDLE_POLL_MS after 30 s of quiet
+//   - optional WS_URL: a log subscription on the token wakes the loop the moment a buy lands, so the
+//     idle poll is only a safety net
 //
 // Belt and braces for "never miss a buy":
 //   - several RPC endpoints behind a fallback transport (see main.ts)
@@ -17,13 +23,16 @@ const hex = (n: bigint) => '0x' + n.toString(16);
 const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
 
 export type WatcherOpts = {
-  startBlock: bigint; pollMs: number; maxRange: bigint; confirmations: bigint;
+  startBlock: bigint; pollMs: number; idlePollMs: number; maxRange: bigint; confirmations: bigint;
   rescanBlocks: bigint; rescanEveryMs: number;
 };
 
 export class Watcher {
   client: PublicClient; ctx: Ctx; ledger: Ledger; price: EthUsd; opts: WatcherOpts;
   onQueued: () => void;
+  #wake: (() => void) | null = null;
+  #lastActivity = 0;
+  #headHint = 0n; // highest block seen by the websocket; saves an eth_blockNumber and its lag
   health = { head: 0n, cursor: 0n, lastError: '' as string, lastErrorAt: 0, rescans: 0, recovered: 0 };
 
   constructor(client: PublicClient, ctx: Ctx, ledger: Ledger, price: EthUsd, opts: WatcherOpts, onQueued: () => void) {
@@ -58,14 +67,17 @@ export class Watcher {
     const range = { fromBlock: hex(from), toBlock: hex(to) };
     const pools = [...this.ctx.pools].map(pad);
     const hasWeth = BigInt(this.ctx.weth) !== 0n && pools.length > 0;
-    const [tok, curve, wIn, wOut] = await Promise.all([
-      this.getLogs({ ...range, address: this.ctx.token, topics: [TOPIC.Transfer] }),
-      this.getLogs({ ...range, address: this.ctx.curve, topics: [[TOPIC.CurveBuy, TOPIC.CurveSell]] }),
+    const [main, wIn, wOut] = await Promise.all([
+      // One query: our token's Transfers + the (shared) curve's buy/sell events.
+      this.getLogs({ ...range, address: [this.ctx.token, this.ctx.curve], topics: [[TOPIC.Transfer, TOPIC.CurveBuy, TOPIC.CurveSell]] }),
       hasWeth ? this.getLogs({ ...range, address: this.ctx.weth, topics: [TOPIC.Transfer, null, pools] }) : [],
       hasWeth ? this.getLogs({ ...range, address: this.ctx.weth, topics: [TOPIC.Transfer, pools] }) : [],
     ]);
+    const token = this.ctx.token.toLowerCase();
+    const tok = main.filter(l => l.address.toLowerCase() === token && l.topics[0] === TOPIC.Transfer);
     const ours = new Set(tok.map(l => l.transactionHash.toLowerCase()));
-    return [...tok, ...[...curve, ...wIn, ...wOut].filter(l => ours.has(l.transactionHash.toLowerCase()))];
+    const rest = [...main.filter(l => l.address.toLowerCase() !== token), ...wIn, ...wOut];
+    return [...tok, ...rest.filter(l => ours.has(l.transactionHash.toLowerCase()))];
   }
 
   /**
@@ -105,6 +117,18 @@ export class Watcher {
     return res;
   }
 
+  /** Called by the websocket subscription: poll right now, up to at least `block`. */
+  poke(block?: bigint) {
+    if (block && block > this.#headHint) this.#headHint = block;
+    this.#lastActivity = Date.now();
+    this.#wake?.();
+  }
+
+  #pause() {
+    const ms = Date.now() - this.#lastActivity < 30_000 ? this.opts.pollMs : this.opts.idlePollMs;
+    return new Promise<void>(r => { this.#wake = r; setTimeout(r, ms); }).finally(() => { this.#wake = null; });
+  }
+
   #error(where: string, e: any) {
     this.health.lastError = `${where}: ${e.shortMessage ?? e.message}`;
     this.health.lastErrorAt = Date.now();
@@ -119,9 +143,12 @@ export class Watcher {
     this.#rescanLoop();
     for (;;) {
       try {
-        const head = (await this.client.getBlockNumber({ cacheTime: 0 })) - this.opts.confirmations;
+        // A websocket log already tells us a newer block exists; only ask the node when it doesn't.
+        const head = this.#headHint > cursor && this.opts.confirmations === 0n
+          ? this.#headHint
+          : (await this.client.getBlockNumber({ cacheTime: 0 })) - this.opts.confirmations;
         this.health.head = head; this.health.cursor = cursor;
-        if (head <= cursor) { await sleep(this.opts.pollMs); continue; }
+        if (head <= cursor) { await this.#pause(); continue; }
         const to = head - cursor > range ? cursor + range : head;
         const t0 = Date.now();
 
@@ -133,8 +160,12 @@ export class Watcher {
         if (range < this.opts.maxRange) range *= 2n;
 
         const buys = res.trades.filter(t => t.kind === 'buy').length;
-        if (res.trades.length) console.log(`[watch] block ${cursor}: ${buys} buy(s), ${res.trades.length - buys} other, ${Date.now() - t0}ms`);
+        if (res.trades.length) {
+          this.#lastActivity = Date.now();
+          console.log(`[watch] block ${cursor}: ${buys} buy(s), ${res.trades.length - buys} other, ${Date.now() - t0}ms`);
+        }
         if (queued) this.onQueued();
+        if (head - cursor < 50n) await this.#pause(); // caught up: wait for the next tick instead of spinning
       } catch (e: any) {
         this.#error('watch', e);
         if (range > 1n) range /= 2n;

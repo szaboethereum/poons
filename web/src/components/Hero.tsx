@@ -1,5 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Art, chipTraits, rarityOf, toSeed } from '../lib/art';
+import { Art, chipTraits, isFounder, rarityOf, toSeed } from '../lib/art';
+import { href } from '../lib/router';
+import { Logo } from './Logo';
+import { FounderBadge } from './FounderBadge';
 import { num, usd } from '../lib/format';
 import type { Drop, Stats } from '../lib/types';
 import { useReducedMotion } from '../hooks/misc';
@@ -48,7 +51,7 @@ export function Hero({ stats, drops, onOpen }: Props) {
       <div className="wrap hero__grid">
         <div className="hero__copy">
           <p className="eyebrow">Free mint · fully on-chain · Robinhood Chain</p>
-          <h1 id="hero-title" className="wordmark wordmark--xl">Poons</h1>
+          <h1 id="hero-title" className="hero__logo" tabIndex={-1} data-page-title><Logo height={96} title="Poons" /></h1>
           <p className="hero__lede">
             Make one buy of <strong>{minBuy}+</strong> of the token on Pons and a 32×32 pixel Poon lands
             in your wallet <strong>within seconds</strong>. <span className="nowrap">Free. One per wallet.</span>
@@ -72,7 +75,7 @@ export function Hero({ stats, drops, onOpen }: Props) {
             <a className="btn btn--primary" href={stats?.ponsUrl ?? 'https://www.ponsfamily.com/'} target="_blank" rel="noopener noreferrer">
               Buy on Pons <span aria-hidden="true">↗</span>
             </a>
-            <a className="btn btn--ghost" href="#wallet">Check my wallet</a>
+            <a className="btn btn--ghost" href={href('check')}>Check my wallet</a>
           </div>
         </div>
 
@@ -92,6 +95,7 @@ export function Hero({ stats, drops, onOpen }: Props) {
               <span className="mono">{slide.drop ? `#${slide.drop.tokenId}` : 'Preview'}</span>
               <span className="dim">{slide.drop ? (i % slides.length === 0 ? 'latest drop' : 'recent drop') : 'random seed'}</span>
               <TierBadge rarity={rarity} small />
+              {isFounder(slide.seed) && <FounderBadge small />}
             </div>
             <ul className="chips" aria-label="Traits">
               {traits.slice(0, 5).map((t) => <li key={t.key} className={t.special ? 'chip chip--special' : 'chip'}>{t.value}</li>)}

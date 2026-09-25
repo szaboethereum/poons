@@ -37,17 +37,36 @@ special "Type" trait, and `rarity()` are read from the engine at runtime, so new
 without code changes. If the engine has no `rarity()` or no Type trait, the related filters and
 badges are hidden.
 
+## Routes
+
+Hash routing, so any static host works: `#/` Home · `#/check` · `#/drops` · `#/gallery` · `#/rarity` ·
+`#/stats` · `#/roadmap` · `#/docs` (sections at `#/docs/<id>`, e.g. `#/docs/api`) · `#/faq`.
+Old single-page anchors (`#wallet`, `#gallery`…) still resolve.
+
+The Stats page uses `/api/stats/overview`, `/api/stats/series`, `/api/stats/buy-sizes`, `/api/seeds` and
+`/api/health`; minted-vs-expected distributions are computed client-side from the seeds with the art
+engine. Charts are hand-built SVG (no chart library). Demo mode generates ~2 days of fake activity
+(a few hundred mints, the first ~38% Founding Residents) so every chart can be reviewed offline, e.g.
+`VITE_API_URL=http://127.0.0.1:9 npm run dev`.
+
+## Brand
+
+`public/logo.png` and `public/pfp.png` are copied from `brand/`. `src/components/Logo.tsx` is the same
+wordmark traced 1:1 from `logo.png` (42×9 cells) as inline SVG, so the ink follows the light/dark theme.
+
 ## Layout
 
 ```
 src/
-  main.tsx, App.tsx, styles.css      entry, page composition, design tokens + styles
-  lib/api.ts                         typed API client + demo-mode fallback
-  lib/demo.ts                        demo data generator
+  main.tsx, App.tsx, styles.css      entry, route switch, design tokens + styles
+  lib/router.ts                      hash router, route titles, scroll/focus on navigation
+  lib/api.ts, lib/demo.ts            typed API client + demo-mode dataset
   lib/types.ts                       API response types
-  lib/art.ts                         typed wrapper around the art engine
-  lib/format.ts                      addresses, time, currency, explorer links
-  lib/wallet.ts                      injected EIP-1193 wallet access
-  hooks/                             polling, clock, reduced motion, demo flag
-  components/                        one file per section, plus Poon, TierBadge, PoonDetail
+  lib/art.ts                         typed wrapper around the art engine (+ founder, expected tiers)
+  lib/chart.ts                       scales, ticks, number/time formatting for charts
+  lib/format.ts, lib/wallet.ts       formatting, explorer links, injected EIP-1193 wallet
+  hooks/                             polling, clock, element width, reduced motion, demo flag
+  pages/                             Home, Stats, Roadmap, Docs
+  components/                        Header, Page shell, Logo, Poon, badges, wallet checker, drops,
+                                     gallery, rarity, FAQ, detail dialog; stats/ holds the charts
 ```

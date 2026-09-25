@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { poonSvg, rarityOf, seedHex, toSeed, traitsOf } from '../lib/art';
+import { isFounder, poonSvg, rarityOf, seedHex, toSeed, traitsOf } from '../lib/art';
+import { FounderBadge } from './FounderBadge';
 import { explorerAddr, explorerTx, pct, shortAddr } from '../lib/format';
 import type { Drop } from '../lib/types';
 import { Poon } from './Poon';
@@ -22,6 +23,7 @@ export function PoonDetail({ drop, chainId, onClose }: Props) {
 
   const seed = drop ? toSeed(drop.seed) : null;
   const traits = useMemo(() => (seed !== null ? traitsOf(seed) : []), [seed]);
+  const founder = seed !== null && isFounder(seed);
   const rarity = useMemo(() => (seed !== null ? rarityOf(seed) : null), [seed]);
   const svgHref = useMemo(() => (seed !== null ? URL.createObjectURL(new Blob([poonSvg(seed)], { type: 'image/svg+xml' })) : null), [seed]);
   useEffect(() => () => { if (svgHref) URL.revokeObjectURL(svgHref); }, [svgHref]);
@@ -49,13 +51,14 @@ export function PoonDetail({ drop, chainId, onClose }: Props) {
               <h2 id="detail-title">Poon <span className="mono">#{drop.tokenId}</span></h2>
               <button className="icon-btn" onClick={onClose} aria-label="Close">✕</button>
             </div>
-            {rarity && (
+            {(rarity || founder) && (
               <p className="detail__rarity">
-                <TierBadge rarity={rarity} /> <span className="mono dim">score {Number.isFinite(rarity.score) ? rarity.score.toFixed(rarity.score % 1 ? 2 : 0) : rarity.score}</span>
+                {rarity && <><TierBadge rarity={rarity} /> <span className="mono dim">score {Number.isFinite(rarity.score) ? rarity.score.toFixed(rarity.score % 1 ? 2 : 0) : rarity.score}</span></>}
+                {founder && <FounderBadge />}
               </p>
             )}
             <dl className="traits">
-              {traits.map((t) => (
+              {traits.filter((t) => t.key !== 'Status').map((t) => (
                 <div key={t.key} className={t.special ? 'trait trait--special' : 'trait'}>
                   <dt>{t.key}</dt>
                   <dd><span>{t.value}</span><span className="mono dim">{t.pct === null ? 'special' : pct(t.pct)}</span></dd>

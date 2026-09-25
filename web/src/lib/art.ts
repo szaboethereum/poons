@@ -86,7 +86,8 @@ export function traitsOf(seed: bigint): TraitRow[] {
 }
 
 /** Traits worth showing as chips: the plain (non-special) type and empty 'None' slots are left out. */
-export const chipTraits = (seed: bigint): TraitRow[] => traitsOf(seed).filter((t) => (!t.isType || t.special) && t.value !== 'None');
+export const chipTraits = (seed: bigint): TraitRow[] =>
+  traitsOf(seed).filter((t) => (!t.isType || t.special) && t.value !== 'None' && t.key !== 'Status');
 
 /** Label of the special-type trait for a seed, or null if the engine has no such trait. */
 export function typeOf(seed: bigint): string | null {
@@ -118,3 +119,29 @@ export function seedForOption(k: number, i: number): bigint | null {
 }
 
 export function seedHex(seed: bigint): string { return '0x' + seed.toString(16).padStart(64, '0'); }
+
+/** Founding Resident: the qualifying buy happened on the bonding curve, before graduation (seed bit 255). */
+export function isFounder(seed: bigint): boolean {
+  if (typeof Art.isFounder === 'function') return Art.isFounder(seed);
+  return (seed >> 255n & 1n) === 1n;
+}
+
+let tierCache: { tier: string; share: number }[] | null | undefined;
+/**
+ * Expected tier distribution from the engine, estimated once by sampling random seeds.
+ * Returns null when the engine has no rarity().
+ */
+export function expectedTiers(samples = 6000): { tier: string; share: number }[] | null {
+  if (tierCache !== undefined) return tierCache;
+  if (!hasRarity()) return (tierCache = null);
+  const counts = new Map<string, number>();
+  for (let i = 0; i < samples; i++) {
+    const r = rarityOf(Art.randomSeed());
+    if (!r) return (tierCache = null);
+    counts.set(r.tier, (counts.get(r.tier) ?? 0) + 1);
+  }
+  const order = [...TIERS, ...[...counts.keys()].filter((t) => !(TIERS as readonly string[]).includes(t))];
+  tierCache = order.filter((t) => counts.has(t)).map((t) => ({ tier: t, share: (counts.get(t)! / samples) * 100 }));
+  return tierCache;
+}
+export const TIER_SAMPLES = 6000;

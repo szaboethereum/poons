@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useId, useMemo, useState } from 'react';
 import { api } from '../lib/api';
-import { TIERS, TRAITS, TYPE_TRAIT, hasRarity, rarityOf, toSeed, typeOf } from '../lib/art';
+import { TIERS, TRAITS, TYPE_TRAIT, hasRarity, isFounder, rarityOf, toSeed, typeOf } from '../lib/art';
 import { num } from '../lib/format';
 import type { Drop } from '../lib/types';
+import { Page } from './Page';
 import { Poon } from './Poon';
+import { FounderBadge } from './FounderBadge';
 import { TierBadge } from './TierBadge';
 
 const PAGE = 48;
 
-interface Row { drop: Drop; tier: string | null; type: string | null }
+interface Row { drop: Drop; tier: string | null; type: string | null; founder: boolean }
 
 export function Gallery({ onOpen, latestId }: { onOpen: (d: Drop) => void; latestId: number | undefined }) {
   const tierId = useId();
@@ -19,10 +21,12 @@ export function Gallery({ onOpen, latestId }: { onOpen: (d: Drop) => void; lates
   const [error, setError] = useState<string | null>(null);
   const [tier, setTier] = useState('');
   const [type, setType] = useState('');
+  const [resident, setResident] = useState<'' | 'founder' | 'later'>('');
+  const residentId = useId();
 
   const toRow = (d: Drop): Row => {
     const s = toSeed(d.seed);
-    return { drop: d, tier: s !== null ? rarityOf(s)?.tier ?? null : null, type: s !== null ? typeOf(s) : null };
+    return { drop: d, tier: s !== null ? rarityOf(s)?.tier ?? null : null, type: s !== null ? typeOf(s) : null, founder: s !== null && isFounder(s) };
   };
 
   const load = useCallback(async (offset: number) => {
@@ -59,26 +63,19 @@ export function Gallery({ onOpen, latestId }: { onOpen: (d: Drop) => void; lates
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestId]);
 
-  const shown = useMemo(() => rows.filter((r) => (!tier || r.tier === tier) && (!type || r.type === type)), [rows, tier, type]);
+  const shown = useMemo(() => rows.filter((r) => (!tier || r.tier === tier) && (!type || r.type === type) && (!resident || (resident === 'founder') === r.founder)), [rows, tier, type, resident]);
   const tierOptions = useMemo(() => {
     const extra = [...new Set(rows.map((r) => r.tier).filter((t): t is string => !!t && !(TIERS as readonly string[]).includes(t)))];
     return [...TIERS, ...extra];
   }, [rows]);
-  const filtering = !!(tier || type);
+  const filtering = !!(tier || type || resident);
   const more = total !== null && rows.length < total;
 
   return (
-    <section className="section section--alt" id="gallery" aria-labelledby="gallery-title">
-      <div className="wrap">
-        <header className="section__head section__head--row">
-          <div>
-            <p className="eyebrow">Gallery</p>
-            <h2 id="gallery-title">Every Poon so far</h2>
-          </div>
-          <p className="section__sub">{total !== null ? `${num(total)} minted. ` : ''}Click one for its traits.</p>
-        </header>
+    <Page eyebrow="Gallery" title="Every Poon so far" sub={`${total !== null ? `${num(total)} minted. ` : ''}Click one for its traits.`}>
 
-        {(hasRarity() || TYPE_TRAIT >= 0) && (
+        {(
+
           <div className="filters" role="group" aria-label="Filter the gallery">
             {hasRarity() && (
               <div className="field">
@@ -98,10 +95,18 @@ export function Gallery({ onOpen, latestId }: { onOpen: (d: Drop) => void; lates
                 </select>
               </div>
             )}
+            <div className="field">
+              <label htmlFor={residentId} className="label">Residents</label>
+              <select id={residentId} className="select" value={resident} onChange={(e) => setResident(e.target.value as '' | 'founder' | 'later')}>
+                <option value="">All residents</option>
+                <option value="founder">Founding Residents</option>
+                <option value="later">Later residents</option>
+              </select>
+            </div>
             {filtering && (
               <p className="filters__count" aria-live="polite">
                 {num(shown.length)} of {num(rows.length)} loaded match
-                <button className="link-btn" onClick={() => { setTier(''); setType(''); }}>Clear</button>
+                <button className="link-btn" onClick={() => { setTier(''); setType(''); setResident(''); }}>Clear</button>
               </p>
             )}
           </div>
@@ -112,12 +117,12 @@ export function Gallery({ onOpen, latestId }: { onOpen: (d: Drop) => void; lates
         {filtering && rows.length > 0 && shown.length === 0 && <p className="empty">None of the loaded Poons match. {more ? 'Load more to keep looking.' : ''}</p>}
 
         <ul className="grid">
-          {shown.map(({ drop, tier: t }) => (
+          {shown.map(({ drop, tier: t, founder }) => (
             <li key={drop.tokenId}>
-              <button className="tile" onClick={() => onOpen(drop)} aria-label={`Poon #${drop.tokenId}${t ? `, ${t}` : ''}`}>
+              <button className="tile" onClick={() => onOpen(drop)} aria-label={`Poon #${drop.tokenId}${t ? `, ${t}` : ''}${founder ? ', Founding Resident' : ''}`}>
                 <Poon seed={drop.seed} size={160} alt="" className="tile__art" />
                 <span className="tile__foot">
-                  <span className="mono">#{drop.tokenId}</span>
+                  <span className="mono tile__id">#{drop.tokenId}{founder && <FounderBadge iconOnly />}</span>
                   {t && <TierBadge rarity={{ tier: t, score: 0 }} small />}
                 </span>
               </button>
@@ -133,7 +138,6 @@ export function Gallery({ onOpen, latestId }: { onOpen: (d: Drop) => void; lates
             </button>
           </div>
         )}
-      </div>
-    </section>
+      </Page>
   );
 }

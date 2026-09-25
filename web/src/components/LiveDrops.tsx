@@ -2,7 +2,12 @@ import { useEffect, useRef } from 'react';
 import { explorerTx, relTime, shortAddr } from '../lib/format';
 import type { Drop } from '../lib/types';
 import { useNow } from '../hooks/misc';
+import { Page } from './Page';
 import { Poon } from './Poon';
+import { FounderBadge } from './FounderBadge';
+import { isFounder, toSeed } from '../lib/art';
+
+const founderOf = (seed: string) => { const s = toSeed(seed); return s !== null && isFounder(s); };
 
 interface Props { drops: Drop[] | undefined; error: string | null; chainId: number | undefined; onOpen: (d: Drop) => void }
 
@@ -17,15 +22,7 @@ export function LiveDrops({ drops, error, chainId, onOpen }: Props) {
   useEffect(() => { if (drops) seen.current = new Set(drops.map((d) => d.tokenId)); }, [drops]);
 
   return (
-    <section className="section" id="drops" aria-labelledby="drops-title">
-      <div className="wrap">
-        <header className="section__head section__head--row">
-          <div>
-            <p className="eyebrow"><span className="live-dot" aria-hidden="true" /> Live</p>
-            <h2 id="drops-title">Fresh drops</h2>
-          </div>
-          <p className="section__sub">Every Poon airdropped, newest first. Updates every few seconds.</p>
-        </header>
+    <Page eyebrow={<><span className="live-dot" aria-hidden="true" /> Live</>} title="Fresh drops" sub="Every Poon airdropped, newest first. Updates every few seconds.">
 
         {error && !drops && <p className="alert">Couldn't load drops: {error}</p>}
         {!drops && !error && <ul className="drops">{Array.from({ length: 6 }, (_, i) => <li key={i} className="drop drop--skeleton" />)}</ul>}
@@ -38,7 +35,7 @@ export function LiveDrops({ drops, error, chainId, onOpen }: Props) {
                   <Poon seed={d.seed} size={56} alt="" />
                 </button>
                 <div className="drop__body">
-                  <span className="drop__id mono">#{d.tokenId}</span>
+                  <span className="drop__id mono">#{d.tokenId}{founderOf(d.seed) && <FounderBadge iconOnly />}</span>
                   <span className="drop__to mono" title={d.to}>to {shortAddr(d.to)}</span>
                 </div>
                 <div className="drop__meta">
@@ -49,7 +46,6 @@ export function LiveDrops({ drops, error, chainId, onOpen }: Props) {
             ))}
           </ul>
         )}
-      </div>
-    </section>
+      </Page>
   );
 }

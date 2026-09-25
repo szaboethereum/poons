@@ -25,6 +25,7 @@ export class Minter {
   pub: PublicClient; wallet: WalletClient | null; account: Account | null; poons: `0x${string}`;
   ledger: Ledger; maxBatch: number;
   soldOut = false;
+  #maxSupply: bigint | null = null;
 
   constructor(pub: PublicClient, wallet: WalletClient | null, account: Account | null, poons: `0x${string}`,
     ledger: Ledger, maxBatch: number) {
@@ -67,11 +68,8 @@ export class Minter {
         continue;
       }
       try {
-        const [supply, max] = await Promise.all([
-          this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'totalSupply' }),
-          this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'maxSupply' }),
-        ]);
-        if (supply >= max) { this.soldOut = true; console.log('[mint] max supply reached — minting stopped'); continue; }
+        this.#maxSupply ??= await this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'maxSupply' });
+        if (BigInt(this.ledger.tokens(0, 1).total) >= this.#maxSupply) { this.soldOut = true; console.log('[mint] max supply reached — minting stopped'); continue; }
 
         const t0 = Date.now();
         const hash = await this.wallet!.writeContract({
@@ -79,16 +77,16 @@ export class Minter {
           args: [batch.map(q => ({ to: q.address as `0x${string}`, founder: q.founder }))],
           account: this.account!, chain: this.wallet!.chain,
         });
-        const rc = await this.pub.waitForTransactionReceipt({ hash, pollingInterval: 100, timeout: 60_000 });
+        const rc = await this.pub.waitForTransactionReceipt({ hash, pollingInterval: 250, timeout: 60_000 });
         if (rc.status !== 'success') throw new Error(`drop reverted in ${hash}`);
-        const block = await this.pub.getBlock({ blockNumber: rc.blockNumber });
+        const now = Math.floor(Date.now() / 1000); // ~1 s of the block time; saves a getBlock call
         let minted = 0;
         for (const log of rc.logs) {
           if (log.address.toLowerCase() !== this.poons.toLowerCase()) continue;
           try {
             const ev = decodeEventLog({ abi: POONS_ABI, data: log.data, topics: log.topics });
             if (ev.eventName !== 'Dropped') continue;
-            this.ledger.recordDrop(ev.args.to.toLowerCase(), Number(ev.args.tokenId), seedHex(ev.args.seed), hash, Number(block.timestamp));
+            this.ledger.recordDrop(ev.args.to.toLowerCase(), Number(ev.args.tokenId), seedHex(ev.args.seed), hash, now);
             minted++;
           } catch { /* not ours */ }
         }

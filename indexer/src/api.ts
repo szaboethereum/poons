@@ -5,12 +5,16 @@ import type { Ledger } from './ledger.ts';
 import type { Watcher } from './watcher.ts';
 import type { Minter } from './minter.ts';
 
+import { rpcStats } from './rpc.ts';
+
 export type ApiInfo = { chainId: number; token: string; poons: string; ponsUrl: string; maxSupply: number; minBuyUsd: number };
 
 export function startApi(port: number, ledger: Ledger, watcher: Watcher, minter: Minter, info: ApiInfo) {
   const routes: [RegExp, (m: RegExpMatchArray, q: URLSearchParams) => unknown][] = [
     [/^\/api\/stats$/, () => ({
       ...info, ...ledger.stats(), soldOut: minter.soldOut, updatedAt: Math.floor(Date.now() / 1000),
+      // Graduated = the token trades on a DEX pool now, so no new Founding Residents.
+      graduated: watcher.ctx.pools.size > 0,
     })],
     [/^\/api\/wallet\/(0x[0-9a-fA-F]{40})$/, m => {
       const w = ledger.row(m[1]);
@@ -27,10 +31,18 @@ export function startApi(port: number, ledger: Ledger, watcher: Watcher, minter:
     [/^\/api\/wallet\/(.*)$/, () => { throw Object.assign(new Error('Not a valid wallet address'), { status: 400 }); }],
     [/^\/api\/recent$/, (_, q) => ({ drops: ledger.tokens(0, clamp(q.get('limit'), 24, 100)).tokens })],
     [/^\/api\/tokens$/, (_, q) => ledger.tokens(clamp(q.get('offset'), 0, 1e9), clamp(q.get('limit'), 48, 200))],
+    [/^\/api\/stats\/series$/, (_, q) => {
+      const bucket = ({ hour: 3600, day: 86400, '10m': 600 } as Record<string, number>)[q.get('bucket') ?? 'hour'] ?? 3600;
+      return { bucket, series: ledger.series(bucket) };
+    }],
+    [/^\/api\/stats\/buy-sizes$/, () => ({ minBuyUsd: info.minBuyUsd, buckets: ledger.buySizes() })],
+    [/^\/api\/stats\/overview$/, () => ({ ...ledger.overview(), maxSupply: info.maxSupply })],
+    [/^\/api\/seeds$/, () => ({ seeds: ledger.seeds() })],
     [/^\/api\/health$/, () => {
       const h = watcher.health;
       return { ok: h.head - h.cursor < 600n && Date.now() - h.lastErrorAt > 60_000, lagBlocks: Number(h.head - h.cursor),
-        head: Number(h.head), cursor: Number(h.cursor), lastError: h.lastError || null, rescans: h.rescans, recoveredTrades: h.recovered };
+        head: Number(h.head), cursor: Number(h.cursor), lastError: h.lastError || null, rescans: h.rescans, recoveredTrades: h.recovered,
+        rpc: { total: rpcStats.total, perMinute: Math.round(rpcStats.total / Math.max(1, (Date.now() - rpcStats.since) / 60_000)), byMethod: rpcStats.byMethod } };
     }],
   ];
 

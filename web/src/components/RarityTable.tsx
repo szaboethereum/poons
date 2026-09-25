@@ -1,24 +1,11 @@
 import { useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import { Art, TIERS, TRAITS, TYPE_TRAIT, hasRarity, isSpecial, optionPct, rarityOf, seedForOption } from '../lib/art';
+import { TIER_SAMPLES, TRAITS, TYPE_TRAIT, expectedTiers, isSpecial, optionPct, seedForOption } from '../lib/art';
 import { num, pct } from '../lib/format';
+import { Page } from './Page';
 import { Poon } from './Poon';
 
-const SAMPLES = 4000;
-
-/** Approximate tier distribution by sampling random seeds (only if the engine exposes rarity()). */
-function useTierDistribution(): { tier: string; share: number }[] | null {
-  return useMemo(() => {
-    if (!hasRarity()) return null;
-    const counts = new Map<string, number>();
-    for (let i = 0; i < SAMPLES; i++) {
-      const r = rarityOf(Art.randomSeed());
-      if (!r) return null;
-      counts.set(r.tier, (counts.get(r.tier) ?? 0) + 1);
-    }
-    const order = [...TIERS, ...[...counts.keys()].filter((t) => !(TIERS as readonly string[]).includes(t))];
-    return order.filter((t) => counts.has(t)).map((t) => ({ tier: t, share: (counts.get(t)! / SAMPLES) * 100 }));
-  }, []);
-}
+const SAMPLES = TIER_SAMPLES;
+const useTierDistribution = () => useMemo(() => expectedTiers(), []);
 
 const expected = (share: number, supply: number) => {
   const n = (share / 100) * supply;
@@ -57,15 +44,7 @@ export function RarityTable({ maxSupply }: { maxSupply: number }) {
   const maxPct = current ? Math.max(...current.opts.map((o) => o.pct)) : 100;
 
   return (
-    <section className="section" id="rarity" aria-labelledby="rarity-title">
-      <div className="wrap">
-        <header className="section__head section__head--row">
-          <div>
-            <p className="eyebrow">Rarity</p>
-            <h2 id="rarity-title">What's in the mix</h2>
-          </div>
-          <p className="section__sub">Every trait is rolled from the Poon's on-chain seed. Odds below; counts are expected out of {num(maxSupply)}.</p>
-        </header>
+    <Page eyebrow="Rarity" title="What's in the mix" sub={`Every trait is rolled from the Poon's on-chain seed. Odds below; counts are expected out of ${num(maxSupply)}.`}>
 
         <div className="rarity">
           {tiers && (
@@ -136,7 +115,6 @@ export function RarityTable({ maxSupply }: { maxSupply: number }) {
           )}
         </div>
         {tiers && <p className="hint rarity__note">Tier shares estimated from {num(SAMPLES)} simulated seeds. Special types are always Legendary.</p>}
-      </div>
-    </section>
+      </Page>
   );
 }

@@ -1,5 +1,6 @@
 // Generates the X (Twitter) brand assets from the art engine, pixel-perfect (no resampling):
-//   brand/pfp.png   400x400  — the Poon face, the wordmark's "OO" are its glasses
+//   brand/pfp.png   400x400  — pixel wordmark only; the "OO" are a pair of glasses
+//   brand/logo.png  1200x400 — the same wordmark, wide
 //   brand/cover.png 1500x500 — a street of Poons at night, no text
 // Usage: node brand/make-assets.js
 const fs = require('fs');
@@ -57,66 +58,50 @@ function outline(cv, isChar) {
   for (const [x, y] of add) cv.set(x, y, INK);
 }
 
-// ---------------------------------------------------------------- PFP (50x50 cells, 8px)
-// The Poon face fills the circle; the wordmark sits across it and its "OO" are the glasses.
-function pfp() {
-  const N = 50;
-  const cv = canvas(N, N);
-  const char = Array.from({ length: N }, () => Array(N).fill(false));
-  const put = (x, y, col) => { cv.set(x, y, col); if (x >= 0 && y >= 0 && x < N && y < N) char[y][x] = true; };
-  const rect = (x0, y0, x1, y1, col) => { for (let y = y0; y <= y1; y++) for (let x = x0; x <= x1; x++) put(x, y, col); };
-  const felt = { base: '#a8c6d3', sh: '#7fa2b3', hi: '#cfe2ea' };
-  const roof = { base: '#3f8a5f', dk: '#2a6446', edge: '#1d4632' };
-  const pup = { fur: '#d9a766', dk: '#a8753a', hi: '#f1cf98' };
-
-  // face / house block
-  for (let y = 18; y < N; y++) for (let x = 2; x <= 47; x++) put(x, y, x <= 4 || x >= 45 ? felt.sh : felt.base);
-  let v = 0x5eed; const r = () => { v ^= v << 13; v >>>= 0; v ^= v >>> 17; v ^= v << 5; v >>>= 0; return v / 4294967296; };
-  for (let i = 0; i < 34; i++) put(6 + Math.floor(r() * 38), 21 + Math.floor(r() * 22), felt.hi);
-  rect(5, 20, 44, 20, felt.hi);
-  // chimney + roof
-  rect(34, 5, 38, 13, '#8fbfa7'); rect(33, 4, 39, 5, '#6f9f88'); rect(38, 6, 38, 13, '#6f9f88');
-  for (let y = 8; y <= 19; y++) {
-    const half = 2 + (y - 8) * 2.3;
-    for (let x = 0; x < N; x++) if (Math.abs(x + .5 - 25) <= half) put(x, y, y >= 18 ? roof.edge : (y % 2 === 1 && (x + y) % 3 !== 0) ? roof.dk : roof.base);
-  }
-  // golden pup on the ridge (engine shape, recentred)
-  for (const [x, y, s] of A.SHAPES.topper_dog) {
-    const col = { [A.S.FUR]: pup.fur, [A.S.FUR_DK]: pup.dk, [A.S.FUR_HI]: pup.hi, [A.S.BLACK]: '#141316' }[s];
-    put(x + 12, y + 2, col);
-  }
-
-  // bold wordmark: P OO N S (2-pixel strokes so it reads at 48px)
-  const P = ['111110', '110011', '110011', '110011', '111110', '110000', '110000', '110000', '110000'];
-  const Nn = ['1100011', '1110011', '1111011', '1101111', '1100111', '1100011', '1100011', '1100011', '1100011'];
-  const Ss = ['011111', '110000', '110000', '111100', '011110', '000111', '000011', '000011', '111110'];
-  const ty = 26;
-  const glyph = (g, x0) => g.forEach((row, y) => [...row].forEach((b, x) => { if (b === '1') put(x0 + x, ty + y, INK); }));
-  const lens = x0 => {
+// ---------------------------------------------------------------- logo (wordmark only)
+// Pixel wordmark "POONS" whose OO are a pair of glasses: thick frames, a bridge, a glint on each lens.
+// No illustration. Drawn in cells; `wordmark()` returns cell pixels relative to its top-left corner.
+const WORD_W = 42, WORD_H = 9;
+function wordmark(ink, lens) {
+  const px = [];
+  const put = (x, y, c) => px.push([x, y, c]);
+  const glyph = (rows, x0) => rows.forEach((r, y) => [...r].forEach((b, x) => { if (b === '1') put(x0 + x, y, ink); }));
+  glyph(['111110', '110011', '110011', '110011', '111110', '110000', '110000', '110000', '110000'], 0); // P
+  for (const x0 of [8, 18]) { // OO = the two lenses
     for (let y = 0; y < 9; y++) for (let x = 0; x < 8; x++) {
       const frame = x <= 1 || x >= 6 || y <= 1 || y >= 7;
-      put(x0 + x, ty + y, frame ? '#141316' : felt.hi);
+      if ((x === 0 || x === 7) && (y === 0 || y === 8)) continue; // softened corners
+      put(x0 + x, y, frame ? ink : lens.fill);
     }
-    rect(x0 + 3, ty + 3, x0 + 4, ty + 5, '#141316'); put(x0 + 3, ty + 3, '#f6f4ee');
-  };
-  glyph(P, 5);
-  lens(12); lens(21);
-  rect(20, ty + 3, 20, ty + 4, '#141316'); // bridge
-  glyph(Nn, 30);
-  glyph(Ss, 38);
-  // nose + plaid collar
-  rect(24, 38, 25, 39, '#4f9c95'); put(24, 38, '#7cc1ba');
-  for (let y = 45; y < N; y++) for (let x = 12; x <= 37; x++) put(x, y, ((x + 1) % 4 === 0 || y % 4 === 1) ? '#23465a' : ((x >> 1) + (y >> 1)) % 2 ? '#3f6f87' : '#6f9db3');
-
-  outline(cv, char);
-  // lamp-lit background with dithered glow (upper left)
-  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) {
-    if (cv.c[y][x]) continue;
-    const d = Math.hypot(x - 6, y - 7) / 18;
-    cv.c[y][x] = d < 1 && (1 - d) * .75 > bayer(x, y) + .1 ? '#e89a4a' : (y / N) * .8 > bayer(x, y) ? '#244441' : '#17312f';
+    put(x0 + 2, 2, lens.glint); put(x0 + 3, 2, lens.glint); put(x0 + 2, 3, lens.glint); // glare
   }
-  // chimney smoke
-  [[39, 2], [40, 2], [40, 1], [41, 1], [42, 0], [43, 0], [38, 3]].forEach(([x, y]) => { if (!char[y][x]) cv.set(x, y, '#e8eef0'); });
+  put(16, 2, ink); put(17, 2, ink); put(16, 3, ink); put(17, 3, ink); // bridge
+  put(7, 2, ink); put(26, 2, ink); // hinges where the temples would start
+  glyph(['1100011', '1110011', '1111011', '1101111', '1100111', '1100011', '1100011', '1100011', '1100011'], 28); // N
+  glyph(['011111', '110000', '110000', '111100', '011110', '000111', '000011', '000011', '111110'], 36); // S
+  return px;
+}
+
+const LOGO = {
+  ground: '#a8c6d3', // felt blue, the Poon's face
+  ink: '#15141a',
+  lens: { fill: '#cfe2ea', glint: '#ffffff' },
+};
+
+function pfp() {
+  const N = 50, cv = canvas(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++) cv.c[y][x] = LOGO.ground;
+  const x0 = Math.floor((N - WORD_W) / 2), y0 = Math.floor((N - WORD_H) / 2);
+  for (const [x, y, c] of wordmark(LOGO.ink, LOGO.lens)) cv.set(x0 + x, y0 + y, c);
+  return cv;
+}
+
+// Wide wordmark for headers, docs and the site (1200x400).
+function logoWide() {
+  const W = 60, H = 20, cv = canvas(W, H);
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) cv.c[y][x] = LOGO.ground;
+  const x0 = Math.floor((W - WORD_W) / 2), y0 = Math.floor((H - WORD_H) / 2);
+  for (const [x, y, c] of wordmark(LOGO.ink, LOGO.lens)) cv.set(x0 + x, y0 + y, c);
   return cv;
 }
 
@@ -172,4 +157,5 @@ function cover() {
 
 const out = __dirname;
 pfp().encode(8, path.join(out, 'pfp.png'));
+logoWide().encode(20, path.join(out, 'logo.png'));
 cover().encode(5, path.join(out, 'cover.png'));

@@ -41,3 +41,44 @@ export interface Drop {
 
 export interface RecentResponse { drops: Drop[] }
 export interface TokensResponse { total: number; tokens: Drop[] }
+
+// ---- stats endpoints ----
+export interface Overview {
+  uniqueBuyers: number;
+  buys: number;
+  buyVolumeUsd: number;
+  sellVolumeUsd: number;
+  founders: number;
+  minted: number;
+  maxSupply: number;
+  firstDropAt: number | null;
+  lastDropAt: number | null;
+  dropLatencySec: { p50: number | null; p90: number | null; max: number | null; samples: number };
+}
+
+export interface SeriesPoint {
+  /** Bucket start, unix seconds. */
+  t: number;
+  buys: number;
+  qualifyingBuys: number;
+  buyers: number;
+  volumeUsd: number;
+  sells: number;
+  sellUsd: number;
+  drops: number;
+  mintedTotal: number;
+}
+export type Bucket = '10m' | 'hour' | 'day';
+export interface SeriesResponse { bucket: number; series: SeriesPoint[] }
+
+export interface BuySizes { minBuyUsd: number; buckets: { from: number; to: number | null; buys: number }[] }
+export interface SeedsResponse { seeds: [number, string][] }
+export interface Health {
+  ok: boolean;
+  lagBlocks: number;
+  head: number;
+  cursor: number;
+  lastError: string | null;
+  rescans: number;
+  recoveredTrades: number;
+}

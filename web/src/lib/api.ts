@@ -1,7 +1,9 @@
 // Small typed client for the Poons indexer API. If the indexer can't be reached at all
 // (network error / timeout), calls resolve with demo data and the app shows a "Demo data" banner.
-import { demoRecent, demoStats, demoTokens, demoWallet } from './demo';
-import type { RecentResponse, Stats, TokensResponse, WalletStatus } from './types';
+import { demoBuySizes, demoHealth, demoOverview, demoRecent, demoSeeds, demoSeries, demoStats, demoTokens, demoWallet } from './demo';
+import type {
+  Bucket, BuySizes, Health, Overview, RecentResponse, SeedsResponse, SeriesResponse, Stats, TokensResponse, WalletStatus,
+} from './types';
 
 export const API_URL: string = (import.meta.env.VITE_API_URL || 'http://localhost:8788').replace(/\/+$/, '');
 
@@ -44,4 +46,9 @@ export const api = {
   wallet: (address: string) => get<WalletStatus>(`/api/wallet/${encodeURIComponent(address)}`, () => demoWallet(address)),
   recent: (limit = 24) => get<RecentResponse>(`/api/recent?limit=${limit}`, () => demoRecent(limit)),
   tokens: (offset = 0, limit = 48) => get<TokensResponse>(`/api/tokens?offset=${offset}&limit=${limit}`, () => demoTokens(offset, limit)),
+  overview: () => get<Overview>('/api/stats/overview', demoOverview),
+  series: (bucket: Bucket) => get<SeriesResponse>(`/api/stats/series?bucket=${bucket}`, () => demoSeries(bucket)),
+  buySizes: () => get<BuySizes>('/api/stats/buy-sizes', demoBuySizes),
+  seeds: () => get<SeedsResponse>('/api/seeds', demoSeeds),
+  health: () => get<Health>('/api/health', demoHealth),
 };

@@ -1,9 +1,11 @@
 import { useEffect, useId, useState } from 'react';
 import { api } from '../lib/api';
-import { chipTraits, rarityOf, toSeed } from '../lib/art';
+import { chipTraits, isFounder, rarityOf, toSeed } from '../lib/art';
+import { FounderBadge } from './FounderBadge';
 import { explorerAddr, isAddress, shortAddr, usd } from '../lib/format';
 import type { Drop, Stats, WalletStatus } from '../lib/types';
 import { getProvider, onAccountsChanged, requestAccount } from '../lib/wallet';
+import { Page } from './Page';
 import { Poon } from './Poon';
 import { TierBadge } from './TierBadge';
 
@@ -77,13 +79,7 @@ export function WalletChecker({ stats, onOpen }: Props) {
   const hasWallet = typeof window !== 'undefined' && !!getProvider();
 
   return (
-    <section className="section section--alt" id="wallet" aria-labelledby="wallet-title">
-      <div className="wrap wallet">
-        <header className="section__head">
-          <p className="eyebrow">Wallet checker</p>
-          <h2 id="wallet-title">Where's my Poon?</h2>
-          <p className="section__sub">Connect or paste any address to see where it stands. Checking is read-only; nothing is signed.</p>
-        </header>
+    <Page eyebrow="Wallet checker" title="Where's my Poon?" sub="Connect or paste any address to see where it stands. Checking is read-only; nothing is signed." className="wallet">
 
         <div className="wallet__panel">
           <form className="wallet__form" onSubmit={(e) => { e.preventDefault(); check(input); }}>
@@ -118,8 +114,7 @@ export function WalletChecker({ stats, onOpen }: Props) {
             {!result && !busy && !error && <p className="wallet__empty">Results show up here.</p>}
           </div>
         </div>
-      </div>
-    </section>
+      </Page>
   );
 }
 
@@ -163,7 +158,7 @@ function StatusCard({ r, stats, onOpen }: { r: WalletStatus; stats: Stats | unde
             <p>It's in {addr}. One per wallet, so this is the one.</p>
             {seed !== null && (
               <>
-                <TierBadge rarity={rarityOf(seed)} />
+                <span className="badges"><TierBadge rarity={rarityOf(seed)} />{isFounder(seed) && <FounderBadge />}</span>
                 <ul className="chips">{chipTraits(seed).map((t) => <li key={t.key} className={t.special ? 'chip chip--special' : 'chip'}>{t.value}</li>)}</ul>
               </>
             )}

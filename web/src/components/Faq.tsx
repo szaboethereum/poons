@@ -1,3 +1,4 @@
+import { Page } from './Page';
 import { num, usd } from '../lib/format';
 import type { Stats } from '../lib/types';
 
@@ -15,12 +16,7 @@ export function Faq({ stats }: { stats: Stats | undefined }) {
     [`What happens after ${max}?`, `Supply is capped at ${max}. When the last Poon drops, the airdrop ends for good.`],
   ];
   return (
-    <section className="section section--alt" id="faq" aria-labelledby="faq-title">
-      <div className="wrap faq">
-        <header className="section__head">
-          <p className="eyebrow">FAQ</p>
-          <h2 id="faq-title">Questions</h2>
-        </header>
+    <Page eyebrow="FAQ" title="Questions" className="faq">
         <div className="faq__list">
           {items.map(([q, a]) => (
             <details key={q} className="faq__item">
@@ -29,7 +25,6 @@ export function Faq({ stats }: { stats: Stats | undefined }) {
             </details>
           ))}
         </div>
-      </div>
-    </section>
+      </Page>
   );
 }

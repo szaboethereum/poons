@@ -130,6 +130,59 @@ export class Ledger {
       (SELECT COUNT(*) FROM wallets WHERE qualified_at IS NULL AND best_buy_usd6 > 0) AS belowMin`).get() as any;
   }
 
+  // ---------------------------------------------------------------- analytics (read-only)
+
+  /** Activity per time bucket (seconds), oldest first. */
+  series(bucket: number) {
+    const trades = this.db.prepare(`SELECT (time / CAST(? AS INTEGER)) * CAST(? AS INTEGER) AS t, COUNT(*) AS buys,
+        SUM(usd6 >= ?) AS qualifyingBuys, COUNT(DISTINCT wallet) AS buyers, SUM(usd6) / 1e6 AS volumeUsd
+      FROM trades WHERE kind = 'buy' GROUP BY 1`).all(bucket, bucket, Number(this.minBuyUsd6)) as any[];
+    const sells = this.db.prepare(`SELECT (time / CAST(? AS INTEGER)) * CAST(? AS INTEGER) AS t, COUNT(*) AS sells, SUM(usd6) / 1e6 AS sellUsd
+      FROM trades WHERE kind = 'out' GROUP BY 1`).all(bucket, bucket) as any[];
+    const drops = this.db.prepare(`SELECT (time / CAST(? AS INTEGER)) * CAST(? AS INTEGER) AS t, COUNT(*) AS drops FROM tokens GROUP BY 1`).all(bucket, bucket) as any[];
+    const by = new Map<number, any>();
+    const row = (t: number) => by.get(t) ?? (by.set(t, { t, buys: 0, qualifyingBuys: 0, buyers: 0, volumeUsd: 0, sells: 0, sellUsd: 0, drops: 0 }), by.get(t));
+    for (const r of trades) Object.assign(row(r.t), { buys: r.buys, qualifyingBuys: r.qualifyingBuys, buyers: r.buyers, volumeUsd: r.volumeUsd });
+    for (const r of sells) Object.assign(row(r.t), { sells: r.sells, sellUsd: r.sellUsd });
+    for (const r of drops) row(r.t).drops = r.drops;
+    let cumulative = 0;
+    return [...by.values()].sort((a, b) => a.t - b.t).map(r => ({ ...r, mintedTotal: (cumulative += r.drops) }));
+  }
+
+  /** Buy sizes in USD buckets (every market buy, not only qualifying ones). */
+  buySizes() {
+    const edges = [0, 5, 10, 25, 50, 100, 250, 1000];
+    const rows = this.db.prepare(`SELECT usd6 / 1e6 AS usd FROM trades WHERE kind = 'buy'`).all() as any[];
+    const out = edges.map((lo, i) => ({ from: lo, to: edges[i + 1] ?? null, buys: 0 }));
+    for (const { usd } of rows) {
+      let i = edges.length - 1; while (i > 0 && usd < edges[i]) i--;
+      out[i].buys++;
+    }
+    return out;
+  }
+
+  /** Headline numbers, including how fast drops land after the qualifying buy. */
+  overview() {
+    const o = this.db.prepare(`SELECT
+      (SELECT COUNT(DISTINCT wallet) FROM trades WHERE kind = 'buy') AS uniqueBuyers,
+      (SELECT COUNT(*) FROM trades WHERE kind = 'buy') AS buys,
+      (SELECT COALESCE(SUM(usd6), 0) / 1e6 FROM trades WHERE kind = 'buy') AS buyVolumeUsd,
+      (SELECT COALESCE(SUM(usd6), 0) / 1e6 FROM trades WHERE kind = 'out') AS sellVolumeUsd,
+      (SELECT COUNT(*) FROM wallets WHERE founder = 1 AND token_id IS NOT NULL) AS founders,
+      (SELECT COUNT(*) FROM tokens) AS minted,
+      (SELECT MIN(time) FROM tokens) AS firstDropAt,
+      (SELECT MAX(time) FROM tokens) AS lastDropAt`).get() as any;
+    const lat = (this.db.prepare(`SELECT t.time - w.qualified_at AS s FROM tokens t JOIN wallets w ON w.address = t.wallet
+      WHERE w.qualified_at IS NOT NULL AND t.time >= w.qualified_at ORDER BY s`).all() as any[]).map(r => r.s);
+    const q = (p: number) => (lat.length ? lat[Math.min(lat.length - 1, Math.floor(p * lat.length))] : null);
+    return { ...o, dropLatencySec: { p50: q(0.5), p90: q(0.9), max: lat.length ? lat[lat.length - 1] : null, samples: lat.length } };
+  }
+
+  /** Every minted token as [tokenId, seed] — enough for the site to compute trait/tier distributions. */
+  seeds(): [number, string][] {
+    return (this.db.prepare('SELECT token_id, seed FROM tokens ORDER BY token_id').all() as any[]).map(r => [r.token_id, r.seed]);
+  }
+
   tokens(offset: number, limit: number) {
     const total = (this.db.prepare('SELECT COUNT(*) AS n FROM tokens').get() as any).n;
     const rows = this.db.prepare('SELECT token_id AS tokenId, wallet AS "to", seed, tx, time FROM tokens ORDER BY token_id DESC LIMIT ? OFFSET ?').all(limit, offset);

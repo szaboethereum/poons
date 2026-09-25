@@ -5,6 +5,7 @@ import { EthUsd } from './price.ts';
 import { Watcher } from './watcher.ts';
 import { Minter } from './minter.ts';
 import { startApi } from './api.ts';
+import { countRpc } from './rpc.ts';
 
 const env = (k: string, d?: string) => {
   const v = process.env[k] || d;
@@ -35,7 +36,7 @@ const chain = defineChain({
   rpcUrls: { default: { http: rpcs } },
 });
 // Every provider gets a turn: a flaky or rate-limited endpoint fails over to the next one.
-const transport = fallback(rpcs.map(u => http(u, { timeout: 8000, retryCount: 1 })), { rank: false, retryCount: 2 });
+const transport = fallback(rpcs.map(u => http(u, { timeout: 8000, retryCount: 1, onFetchRequest: countRpc })), { rank: false, retryCount: 2 });
 const pub = createPublicClient({ chain, transport });
 
 const token = env('TOKEN').toLowerCase();
@@ -60,12 +61,21 @@ const minter = new Minter(pub as any, wallet, account, poons, ledger, Number(env
 
 const watcher = new Watcher(pub as any, ctx, ledger, price, {
   startBlock: BigInt(env('START_BLOCK')),
-  pollMs: Number(env('POLL_MS', '200')),
+  pollMs: Number(env('POLL_MS', '250')),
+  idlePollMs: Number(env('IDLE_POLL_MS', process.env.WS_URL ? '5000' : '2000')),
   maxRange: BigInt(env('MAX_RANGE', '2000')),
   confirmations: BigInt(env('CONFIRMATIONS', '0')),
   rescanBlocks: BigInt(env('RESCAN_BLOCKS', '6000')), // ~10 minutes of blocks
-  rescanEveryMs: Number(env('RESCAN_EVERY_MS', '60000')),
+  rescanEveryMs: Number(env('RESCAN_EVERY_MS', '300000')),
 }, () => minter.kick());
+
+// Optional push trigger: a websocket log subscription on the token wakes the watcher instantly.
+if (process.env.WS_URL) {
+  const { webSocket } = await import('viem');
+  const ws = createPublicClient({ chain, transport: webSocket(process.env.WS_URL, { reconnect: true }) });
+  ws.watchEvent({ address: token as `0x${string}`, onLogs: logs => watcher.poke(logs.reduce((m, l) => (l.blockNumber && l.blockNumber > m ? l.blockNumber : m), 0n)), onError: e => console.error('[ws]', e.message) });
+  console.log('[ws] subscribed to token logs');
+}
 
 startApi(Number(env('API_PORT', '8788')), ledger, watcher, minter, {
   chainId: net.id, token, poons, ponsUrl: net.pons + token, maxSupply: Number(env('MAX_SUPPLY', '3333')),
