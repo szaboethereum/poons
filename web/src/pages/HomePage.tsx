@@ -1,3 +1,4 @@
+import { PONS_URL } from '../lib/config';
 import { api } from '../lib/api';
 import { num, pct } from '../lib/format';
 import { href } from '../lib/router';
@@ -68,7 +69,7 @@ export function HomePage({ stats, drops, onOpen }: Props) {
             <p className="dim">Make one buy of $10 or more on Pons and your Poon lands within seconds.</p>
           </div>
           <div className="cta__actions">
-            <a className="btn btn--primary" href={stats?.ponsUrl ?? 'https://www.ponsfamily.com/'} target="_blank" rel="noopener noreferrer">Buy on Pons ↗</a>
+            <a className="btn btn--primary" href={stats?.ponsUrl ?? PONS_URL} target="_blank" rel="noopener noreferrer">Buy on Pons ↗</a>
             <a className="btn btn--ghost" href={href('check')}>Check my wallet</a>
           </div>
         </div>

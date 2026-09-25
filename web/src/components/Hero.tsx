@@ -1,3 +1,4 @@
+import { PONS_URL } from '../lib/config';
 import { useEffect, useMemo, useState } from 'react';
 import { Art, chipTraits, isFounder, rarityOf, toSeed } from '../lib/art';
 import { href } from '../lib/router';
@@ -72,7 +73,7 @@ export function Hero({ stats, drops, onOpen }: Props) {
           </div>
 
           <div className="hero__ctas">
-            <a className="btn btn--primary" href={stats?.ponsUrl ?? 'https://www.ponsfamily.com/'} target="_blank" rel="noopener noreferrer">
+            <a className="btn btn--primary" href={stats?.ponsUrl ?? PONS_URL} target="_blank" rel="noopener noreferrer">
               Buy on Pons <span aria-hidden="true">↗</span>
             </a>
             <a className="btn btn--ghost" href={href('check')}>Check my wallet</a>

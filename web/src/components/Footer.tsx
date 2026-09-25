@@ -1,10 +1,12 @@
 import { explorerAddr, shortAddr } from '../lib/format';
+import { DEPLOYMENT, PONS_URL } from '../lib/config';
 import { ROUTES, href } from '../lib/router';
 import type { Stats } from '../lib/types';
 import { Logo } from './Logo';
 
 export function Footer({ stats, demo }: { stats: Stats | undefined; demo: boolean }) {
   const real = stats && !demo;
+  const token = real ? stats.token : DEPLOYMENT.token;
   return (
     <footer className="site-footer">
       <div className="wrap site-footer__inner">
@@ -18,9 +20,9 @@ export function Footer({ stats, demo }: { stats: Stats | undefined; demo: boolea
           </ul>
         </nav>
         <ul className="site-footer__meta">
-          {stats?.ponsUrl && <li><a href={stats.ponsUrl} target="_blank" rel="noopener noreferrer">Buy on Pons ↗</a></li>}
-          {real && <li>Poons <a className="mono" href={explorerAddr(stats.chainId, stats.poons)} target="_blank" rel="noopener noreferrer">{shortAddr(stats.poons)}</a></li>}
-          {real && <li>Token <a className="mono" href={explorerAddr(stats.chainId, stats.token)} target="_blank" rel="noopener noreferrer">{shortAddr(stats.token)}</a></li>}
+          {<li><a href={(real && stats.ponsUrl) || PONS_URL} target="_blank" rel="noopener noreferrer">Buy on Pons ↗</a></li>}
+          <li>Poons <a className="mono" href={explorerAddr(DEPLOYMENT.chainId, DEPLOYMENT.poons)} target="_blank" rel="noopener noreferrer">{shortAddr(DEPLOYMENT.poons)}</a></li>
+          {token && <li>Token <a className="mono" href={explorerAddr(DEPLOYMENT.chainId, token)} target="_blank" rel="noopener noreferrer">{shortAddr(token)}</a></li>}
         </ul>
         <p className="site-footer__note dim">Not financial advice. Tokens are risky; only buy what you can afford to lose.</p>
       </div>

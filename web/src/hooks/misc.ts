@@ -1,5 +1,5 @@
 import { useEffect, useState, useSyncExternalStore } from 'react';
-import { demoStore } from '../lib/api';
+import { demoStore, offlineStore } from '../lib/api';
 
 /** Current time in ms, re-rendering every `ms`. */
 export function useNow(ms = 1000): number {
@@ -20,3 +20,4 @@ export function useReducedMotion(): boolean {
 }
 
 export const useDemoMode = (): boolean => useSyncExternalStore(demoStore.subscribe, demoStore.get);
+export const useOffline = (): boolean => useSyncExternalStore(offlineStore.subscribe, offlineStore.get);

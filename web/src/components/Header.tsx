@@ -1,3 +1,4 @@
+import { PONS_URL } from '../lib/config';
 import { useEffect, useRef, useState } from 'react';
 import type { Stats } from '../lib/types';
 import { num } from '../lib/format';
@@ -38,7 +39,7 @@ export function Header({ stats, active }: { stats: Stats | undefined; active: Ro
               {num(stats.minted)}<span className="dim">/{num(stats.maxSupply)}</span>
             </span>
           )}
-          <a className="btn btn--primary btn--small header-cta" href={stats?.ponsUrl ?? 'https://www.ponsfamily.com/'} target="_blank" rel="noopener noreferrer">Buy on Pons</a>
+          <a className="btn btn--primary btn--small header-cta" href={stats?.ponsUrl ?? PONS_URL} target="_blank" rel="noopener noreferrer">Buy on Pons</a>
           <button
             ref={btn}
             className="menu-btn"

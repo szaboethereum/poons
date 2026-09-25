@@ -1,11 +1,13 @@
 import { useCallback, useState } from 'react';
 import { api } from './lib/api';
+import { DEMO } from './lib/config';
 import type { Drop } from './lib/types';
 import { href, useRoute, useRouteEffects } from './lib/router';
 import { usePoll } from './hooks/usePoll';
-import { useDemoMode } from './hooks/misc';
+import { useDemoMode, useOffline } from './hooks/misc';
 import { Header } from './components/Header';
 import { DemoBanner } from './components/DemoBanner';
+import { OfflineBanner } from './components/OfflineBanner';
 import { MintStatusBanner } from './components/MintStatusBanner';
 import { WalletChecker } from './components/WalletChecker';
 import { LiveDrops } from './components/LiveDrops';
@@ -24,6 +26,7 @@ export default function App() {
   const route = useRoute();
   useRouteEffects(route);
   const demo = useDemoMode();
+  const offline = useOffline();
   const stats = usePoll(api.stats, 10_000);
   const recent = usePoll(() => api.recent(24), 5_000);
   const [detail, setDetail] = useState<Drop | null>(null);
@@ -56,8 +59,9 @@ export default function App() {
         Skip to content
       </a>
       <Header stats={stats.data} active={route.id} />
-      {demo && <DemoBanner />}
-      {!demo && <MintStatusBanner stats={stats.data} />}
+      {DEMO && demo && <DemoBanner />}
+      {!demo && offline && <OfflineBanner />}
+      {!demo && !offline && <MintStatusBanner stats={stats.data} />}
       <main id="main" tabIndex={-1} key={route.id}>{page}</main>
       <Footer stats={stats.data} demo={demo} />
       <PoonDetail drop={detail} chainId={chainId} onClose={() => setDetail(null)} />

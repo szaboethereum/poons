@@ -1,3 +1,4 @@
+import { PONS_URL } from '../lib/config';
 import { useEffect, useId, useState } from 'react';
 import { api } from '../lib/api';
 import { chipTraits, isFounder, rarityOf, toSeed } from '../lib/art';
@@ -123,7 +124,7 @@ function StatusCard({ r, stats, onOpen }: { r: WalletStatus; stats: Stats | unde
   const addr = (
     <a className="mono" href={explorerAddr(stats?.chainId, r.address)} target="_blank" rel="noopener noreferrer">{shortAddr(r.address)}</a>
   );
-  const buy = stats?.ponsUrl && <a className="btn btn--primary btn--small" href={stats.ponsUrl} target="_blank" rel="noopener noreferrer">Buy on Pons ↗</a>;
+  const buy = <a className="btn btn--primary btn--small" href={stats?.ponsUrl ?? PONS_URL} target="_blank" rel="noopener noreferrer">Buy on Pons ↗</a>;
 
   switch (r.status) {
     case 'below_min':

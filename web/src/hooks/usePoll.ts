@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { demoStore } from '../lib/api';
+import { demoStore, offlineStore } from '../lib/api';
 
 export interface PollState<T> { data: T | undefined; error: string | null; loading: boolean; refresh: () => void }
 
@@ -41,13 +41,14 @@ export function usePoll<T>(fn: () => Promise<T>, ms: number | null, deps: readon
   const refresh = useCallback(() => setKick((k) => k + 1), []);
 
   // Refetch right away when the tab becomes visible again, or when the indexer comes back online
-  // (demo -> live), so stale data never sits on screen without the demo banner.
+  // (demo/offline -> live), so every panel catches up at once.
   useEffect(() => {
-    let wasDemo = demoStore.get();
+    let wasDemo = demoStore.get(), wasOffline = offlineStore.get();
     const onVis = () => { if (!document.hidden) refresh(); };
-    const unsub = demoStore.subscribe(() => { const d = demoStore.get(); if (wasDemo && !d) refresh(); wasDemo = d; });
+    const unDemo = demoStore.subscribe(() => { const d = demoStore.get(); if (wasDemo && !d) refresh(); wasDemo = d; });
+    const unOff = offlineStore.subscribe(() => { const o = offlineStore.get(); if (wasOffline && !o) refresh(); wasOffline = o; });
     document.addEventListener('visibilitychange', onVis);
-    return () => { unsub(); document.removeEventListener('visibilitychange', onVis); };
+    return () => { unDemo(); unOff(); document.removeEventListener('visibilitychange', onVis); };
   }, [refresh]);
   return { data, error, loading, refresh };
 }

@@ -53,7 +53,7 @@ export function StatsPage() {
       className="stats"
       eyebrow="Stats"
       title="Poons by the numbers"
-      sub={<>{demo ? 'Generated demo data (indexer offline).' : 'Live from the indexer.'}{o?.lastDropAt ? <> Last drop {fmtFull(o.lastDropAt)}.</> : null}</>}
+      sub={<>{demo ? 'Generated demo data (local development).' : 'Live from the indexer.'}{o?.lastDropAt ? <> Last drop {fmtFull(o.lastDropAt)}.</> : null}</>}
       aside={<HealthChip health={health.data} error={health.error} demo={demo} />}
     >
       <Kpis o={o} />

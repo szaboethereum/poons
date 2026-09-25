@@ -3,6 +3,7 @@ import { API_URL } from '../lib/api';
 import { TRAITS, TIERS, TYPE_TRAIT, SPECIAL_NAMES } from '../lib/art';
 import { explorerAddr, MAINNET_CHAIN_ID, TESTNET_CHAIN_ID, usd, num } from '../lib/format';
 import { href } from '../lib/router';
+import { DEPLOYMENT } from '../lib/config';
 import type { Stats } from '../lib/types';
 import { Page } from '../components/Page';
 import { AddressRow, Code } from '../components/Copy';
@@ -19,7 +20,7 @@ const SECTIONS = [
 
 const J = (v: unknown) => JSON.stringify(v, null, 2);
 const ENDPOINTS: { path: string; desc: string; example: unknown }[] = [
-  { path: '/api/stats', desc: 'Headline numbers and addresses.', example: { chainId: 46630, token: '0x4f31…5d93', poons: '0x795d…93B3', ponsUrl: 'https://www.ponsfamily.com/launchpad/0x4f31…', maxSupply: 3333, minBuyUsd: 10, minted: 4, queued: 0, belowMin: 2, soldOut: false, updatedAt: 1790350507 } },
+  { path: '/api/stats', desc: 'Headline numbers and addresses.', example: { chainId: 4663, token: '0x4f31…5d93', poons: '0xD715…F2B2', ponsUrl: 'https://www.ponsfamily.com/launchpad/0x4f31…', maxSupply: 3333, minBuyUsd: 10, minted: 4, queued: 0, belowMin: 2, soldOut: false, updatedAt: 1790350507 } },
   { path: '/api/stats/overview', desc: 'Totals for the Stats page. Times are unix seconds.', example: { uniqueBuyers: 6, buys: 8, buyVolumeUsd: 97.92, sellVolumeUsd: 19.81, founders: 4, minted: 4, maxSupply: 3333, firstDropAt: 1790349801, lastDropAt: 1790349808, dropLatencySec: { p50: 1, p90: 1, max: 1, samples: 4 } } },
   { path: '/api/stats/series?bucket=10m|hour|day', desc: 'Activity per time bucket, oldest first. Empty buckets are omitted.', example: { bucket: 3600, series: [{ t: 1790348400, buys: 8, qualifyingBuys: 5, buyers: 6, volumeUsd: 97.92, sells: 2, sellUsd: 19.81, drops: 4, mintedTotal: 4 }] } },
   { path: '/api/stats/buy-sizes', desc: 'Histogram of single buys by USD size. `to: null` is open-ended.', example: { minBuyUsd: 10, buckets: [{ from: 5, to: 10, buys: 3 }, { from: 10, to: 25, buys: 5 }, { from: 1000, to: null, buys: 0 }] } },
@@ -44,8 +45,10 @@ function Section({ id, title, children }: { id: string; title: string; children:
 export function DocsPage({ stats, sub }: { stats: Stats | undefined; sub: string | null }) {
   const minBuy = usd(stats?.minBuyUsd ?? 10);
   const max = num(stats?.maxSupply ?? 3333);
-  const net = stats ? NETWORKS[stats.chainId] : undefined;
-  const poons = stats?.poons ?? '<POONS_ADDRESS>';
+  const chainId = stats?.chainId ?? DEPLOYMENT.chainId;
+  const net = NETWORKS[chainId];
+  const poons = stats?.poons ?? DEPLOYMENT.poons;
+  const token = stats?.token ?? DEPLOYMENT.token;
   const rpc = net?.rpc ?? '<RPC_URL>';
   const specials = TYPE_TRAIT >= 0 ? TRAITS[TYPE_TRAIT].opts.map((o) => o[0]).filter((n) => SPECIAL_NAMES.has(n)) : [];
 
@@ -113,18 +116,17 @@ export function DocsPage({ stats, sub }: { stats: Stats | undefined; sub: string
           </Section>
 
           <Section id="contracts" title="Contracts">
-            {stats ? (
-              <dl className="addr-list">
-                <div className="addr-row"><dt>Network</dt><dd>{net ? `${net.name} (chain ID ${stats.chainId})` : `Chain ID ${stats.chainId}`}</dd></div>
-                <AddressRow label="Poons (ERC-721)" value={stats.poons} link={explorerAddr(stats.chainId, stats.poons)} />
-                <AddressRow label="Token" value={stats.token} link={explorerAddr(stats.chainId, stats.token)} />
-                {net && <AddressRow label="Public RPC" value={net.rpc} />}
-              </dl>
-            ) : <p className="dim">Loading addresses…</p>}
+            <dl className="addr-list">
+              <div className="addr-row"><dt>Network</dt><dd>{net ? `${net.name} (chain ID ${chainId})` : `Chain ID ${chainId}`}</dd></div>
+              <AddressRow label="Poons (ERC-721)" value={poons} link={explorerAddr(chainId, poons)} />
+              <AddressRow label="Renderer" value={DEPLOYMENT.renderer} link={explorerAddr(chainId, DEPLOYMENT.renderer)} />
+              {token ? <AddressRow label="Token" value={token} link={explorerAddr(chainId, token)} /> : <div className="addr-row"><dt>Token</dt><dd className="dim">Announced at launch</dd></div>}
+              {net && <AddressRow label="Public RPC" value={net.rpc} />}
+            </dl>
           </Section>
 
           <Section id="api" title="API reference">
-            <p>All endpoints are <code>GET</code>, return JSON and allow cross-origin requests. Base URL: <code className="mono">{API_URL}</code>. Addresses and hashes are shortened in the examples.</p>
+            <p>All endpoints are <code>GET</code>, return JSON and allow cross-origin requests. Base URL: {API_URL ? <code className="mono">{API_URL}</code> : 'published at launch'}. Addresses and hashes are shortened in the examples.</p>
             {ENDPOINTS.map((e) => (
               <div key={e.path} className="endpoint">
                 <h3><span className="method">GET</span> <code>{e.path}</code></h3>
@@ -145,7 +147,7 @@ cast call ${poons} "dropOf(address)(uint256)" <WALLET> --rpc-url ${rpc}
 # Full metadata + SVG, decoded
 cast call ${poons} "tokenURI(uint256)(string)" 1 --rpc-url ${rpc} \\
   | sed 's/^data:application\\/json;base64,//' | base64 -d`}</Code>
-            <p>No terminal? Open the Poons contract on the {stats ? <a href={explorerAddr(stats.chainId, stats.poons)} target="_blank" rel="noopener noreferrer">block explorer</a> : 'block explorer'}, go to <em>Read contract</em>, and call <code>seedOf</code>, <code>dropOf</code> or <code>tokenURI</code>. Paste a <code>tokenURI</code> result into your browser's address bar to see the metadata.</p>
+            <p>No terminal? Open the Poons contract on the <a href={explorerAddr(chainId, poons)} target="_blank" rel="noopener noreferrer">block explorer</a>, go to <em>Read contract</em>, and call <code>seedOf</code>, <code>dropOf</code> or <code>tokenURI</code>. Paste a <code>tokenURI</code> result into your browser's address bar to see the metadata.</p>
           </Section>
         </div>
       </div>
