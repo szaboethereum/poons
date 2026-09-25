@@ -155,7 +155,34 @@ function cover() {
   return cv;
 }
 
+// ---------------------------------------------------------------- single Poon (1:1)
+// Builds a seed that rolls the given option index for every trait, then renders it at `scale`.
+function seedFor(picks) {
+  let seed = 0n;
+  A.TRAITS.forEach((t, k) => {
+    const i = picks[t.key] ?? 0;
+    const offset = t.opts.slice(0, i).reduce((a, o) => a + o[1], 0); // first value that rolls option i
+    seed |= BigInt(offset) << BigInt(16 * k);
+  });
+  return seed;
+}
+function poonCanvas(seed) {
+  const cv = canvas(32, 32), idx = A.traitsFor(seed), g = A.slotGrid(idx, A.isFounder(seed)), pal = A.palette(idx);
+  for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) cv.c[y][x] = pal[g[y * 32 + x]];
+  return cv;
+}
+
 const out = __dirname;
+// The classic Poon from the reference: felt blue, forest roof, golden pup, black glasses, blue plaid, lamp light.
+const classic = seedFor({ Type: 0, Body: 0, Roof: 0, Topper: 0, Glasses: 0, Eyes: 0, Mouth: 0, Shirt: 0, Item: 0, Background: 0, Smoke: 0 });
+console.log('classic traits:', JSON.stringify(A.traitLabels(A.traitsFor(classic))));
+poonCanvas(classic).encode(38, path.join(out, 'poon-classic.png'));
+// A Legendary: Gold, the rarest type (~3 in 3,333), with a crown on the roof and a diamond in hand.
+const idxOf = (key, name) => A.TRAITS.find(t => t.key === key).opts.findIndex(o => o[0] === name);
+const gold = seedFor({ Type: idxOf('Type', 'Gold'), Topper: idxOf('Topper', 'Crown'), Glasses: idxOf('Glasses', 'Classic Black'),
+  Eyes: idxOf('Eyes', 'Sparkle'), Mouth: idxOf('Mouth', 'Smile'), Item: idxOf('Item', 'Diamond'), Smoke: idxOf('Smoke', 'Stars') });
+console.log('gold:', JSON.stringify(A.traitLabels(A.traitsFor(gold))), A.rarity(gold).tier);
+poonCanvas(gold).encode(38, path.join(out, 'poon-gold.png'));
 pfp().encode(8, path.join(out, 'pfp.png'));
 logoWide().encode(20, path.join(out, 'logo.png'));
 cover().encode(5, path.join(out, 'cover.png'));

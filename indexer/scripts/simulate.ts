@@ -1,5 +1,5 @@
 // TESTNET ONLY: end-to-end rule check against MockPonsCurve.
-// Funds a few throwaway wallets from MINTER_KEY, runs one scenario per rule, then asks the indexer
+// Funds a few throwaway wallets from DEPLOYER_KEY, runs one scenario per rule, then asks the indexer
 // API what each wallet got and compares with the expected outcome.
 //
 //   npm run simulate            # send the trades
@@ -14,7 +14,7 @@ const chain = { id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { na
   rpcUrls: { default: { http: [env('RPC_URLS').split(',')[0]] } } } as const;
 const pub = createPublicClient({ chain, transport: http() });
 if ((await pub.getChainId()) !== 46630) throw new Error('RPC_URLS_TESTNET does not point at Robinhood testnet (46630)');
-const funder = privateKeyToAccount(env('MINTER_KEY') as `0x${string}`);
+const funder = privateKeyToAccount((process.env.DEPLOYER_KEY || env('MINTER_KEY')) as `0x${string}`);
 const curve = env('CURVE') as `0x${string}`, token = env('TOKEN') as `0x${string}`;
 const api = `http://localhost:${process.env.API_PORT || 8788}`;
 const CURVE_ABI = parseAbi(['function buy() payable', 'function sell(uint256)']);

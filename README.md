@@ -50,9 +50,12 @@ cd ../web && npm install && npm run dev    # http://localhost:5173
 ## Mainnet
 Config lives in the `*_MAINNET` block of `.env`; set `NETWORK=mainnet`. Every script refuses to run if the RPC
 isn't chain 4663.
-1. Fund `MINTER_ADDRESS` with a little ETH (deploy + drop gas). The deployer owns the contract and receives creator fees.
+1. Two wallets: `DEPLOYER_*` owns the contract and receives creator fees (stays off servers, needs deploy gas);
+   `MINTER_*_MAINNET` is the server's hot wallet with `MINTER_ROLE` only (fund it with the drop gas, ~0.012 ETH for 3,333).
 2. `cd contracts && CONFIRM_MAINNET=yes ./deploy.sh mainnet` — minting starts **closed**.
 3. Launch the token on ponsfamily.com; put its address in `TOKEN_MAINNET` and its launch block in `START_BLOCK_MAINNET`.
-4. `cd indexer && DRY_RUN=1 npm start` to watch it decide, then `npm start`. Qualifying buys queue up while minting is closed.
-5. Open minting: `cast send $POONS_MAINNET 'setMintOpen(bool)' true --private-key $MINTER_KEY --rpc-url <mainnet rpc>`.
+4. `cd indexer && DRY_RUN=1 npm start` to watch it decide, then deploy it to Railway (`indexer/Dockerfile`,
+   `indexer/railway.json`, volume at `/data`, env vars = the `*_MAINNET` block + `NETWORK=mainnet`, no deployer key).
+   Qualifying buys queue up while minting is closed.
+5. Open minting: `cast send $POONS_MAINNET 'setMintOpen(bool)' true --private-key $DEPLOYER_KEY --rpc-url <mainnet rpc>`.
 6. Watch `GET /api/health` (lag, last error, RPC calls per minute).

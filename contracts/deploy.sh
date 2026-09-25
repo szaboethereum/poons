@@ -14,12 +14,16 @@ case "$NET" in
   *) echo "network must be testnet or mainnet"; exit 1 ;;
 esac
 SUFFIX=$(echo "$NET" | tr a-z A-Z)
+# The deployer signs and becomes owner; MINTER_ROLE goes to the network's minter hot wallet.
+eval "MINTER_ADDRESS=\${MINTER_ADDRESS_${SUFFIX}:-}"
+[ -n "$MINTER_ADDRESS" ] || { echo "Refusing: MINTER_ADDRESS_${SUFFIX} is not set"; exit 1; }
+export MINTER_ADDRESS
 RPC="${RPCS%%,*}"
 GOT=$(cast chain-id --rpc-url "$RPC")
 [ "$GOT" = "$WANT" ] || { echo "Refusing: RPC_URLS_${SUFFIX} is chain $GOT, expected $WANT"; exit 1; }
-echo "Deploying to $NET (chain $GOT) from $MINTER_ADDRESS, balance $(cast balance "$MINTER_ADDRESS" --rpc-url "$RPC" --ether) ETH"
+echo "Deploying to $NET (chain $GOT): owner $DEPLOYER_ADDRESS (balance $(cast balance "$DEPLOYER_ADDRESS" --rpc-url "$RPC" --ether) ETH), minter $MINTER_ADDRESS"
 
-OUT=$(forge script "$SCRIPT" --rpc-url "$RPC" --private-key "$MINTER_KEY" --broadcast --slow 2>&1) || { echo "$OUT" | tail -5; exit 1; }
+OUT=$(forge script "$SCRIPT" --rpc-url "$RPC" --private-key "$DEPLOYER_KEY" --broadcast --slow 2>&1) || { echo "$OUT" | tail -5; exit 1; }
 echo "$OUT" | grep -E "^ *(CURVE|TOKEN|POONS|RENDERER)=" | sed 's/^ *//' | tee /tmp/poons-deploy.env
 BLOCK=$(cast block-number --rpc-url "$RPC")
 while IFS='=' read -r k v; do
@@ -28,4 +32,4 @@ while IFS='=' read -r k v; do
 done < /tmp/poons-deploy.env
 sed -i '' "s|^START_BLOCK_${SUFFIX}=.*|START_BLOCK_${SUFFIX}=$BLOCK|" ../.env
 echo "START_BLOCK_${SUFFIX}=$BLOCK written to ../.env. Minting is CLOSED; open it with:"
-echo "  cast send \$POONS_${SUFFIX} 'setMintOpen(bool)' true --private-key \$MINTER_KEY --rpc-url \${RPC_URLS_${SUFFIX}%%,*}"
+echo "  cast send \$POONS_${SUFFIX} 'setMintOpen(bool)' true --private-key \$DEPLOYER_KEY --rpc-url \${RPC_URLS_${SUFFIX}%%,*}"
