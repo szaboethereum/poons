@@ -1,4 +1,4 @@
-import { PONS_URL } from '../lib/config';
+import { OPENSEA_URL, PONS_URL } from '../lib/config';
 import { api } from '../lib/api';
 import { num, pct } from '../lib/format';
 import { href } from '../lib/router';
@@ -71,6 +71,7 @@ export function HomePage({ stats, drops, onOpen }: Props) {
           <div className="cta__actions">
             <a className="btn btn--primary" href={stats?.ponsUrl ?? PONS_URL} target="_blank" rel="noopener noreferrer">Buy on Pons ↗</a>
             <a className="btn btn--ghost" href={href('check')}>Check my wallet</a>
+            <a className="btn btn--ghost" href={OPENSEA_URL} target="_blank" rel="noopener noreferrer">OpenSea ↗</a>
           </div>
         </div>
       </section>

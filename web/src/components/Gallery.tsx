@@ -4,6 +4,7 @@ import { TIERS, TRAITS, TYPE_TRAIT, hasRarity, isFounder, rarityOf, toSeed, type
 import { num } from '../lib/format';
 import type { Drop } from '../lib/types';
 import { Page } from './Page';
+import { OPENSEA_URL } from '../lib/config';
 import { Poon } from './Poon';
 import { FounderBadge } from './FounderBadge';
 import { TierBadge } from './TierBadge';
@@ -72,7 +73,7 @@ export function Gallery({ onOpen, latestId }: { onOpen: (d: Drop) => void; lates
   const more = total !== null && rows.length < total;
 
   return (
-    <Page eyebrow="Gallery" title="Every Poon so far" sub={`${total !== null ? `${num(total)} minted. ` : ''}Click one for its traits.`}>
+    <Page eyebrow="Gallery" title="Every Poon so far" sub={<>{total !== null ? `${num(total)} minted. ` : ''}Click one for its traits. Trade them on <a href={OPENSEA_URL} target="_blank" rel="noopener noreferrer">OpenSea ↗</a></>}>
 
         {(
 

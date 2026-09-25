@@ -1,5 +1,5 @@
 import { explorerAddr, shortAddr } from '../lib/format';
-import { DEPLOYMENT, PONS_URL } from '../lib/config';
+import { DEPLOYMENT, OPENSEA_URL, PONS_URL } from '../lib/config';
 import { ROUTES, href, isSoon } from '../lib/router';
 import type { Stats } from '../lib/types';
 import { Logo } from './Logo';
@@ -21,6 +21,7 @@ export function Footer({ stats, demo }: { stats: Stats | undefined; demo: boolea
         </nav>
         <ul className="site-footer__meta">
           {<li><a href={(real && stats.ponsUrl) || PONS_URL} target="_blank" rel="noopener noreferrer">Buy on Pons ↗</a></li>}
+          <li><a href={OPENSEA_URL} target="_blank" rel="noopener noreferrer">OpenSea ↗</a></li>
           <li>Poons <a className="mono" href={explorerAddr(DEPLOYMENT.chainId, DEPLOYMENT.poons)} target="_blank" rel="noopener noreferrer">{shortAddr(DEPLOYMENT.poons)}</a></li>
           {token && <li>Token <a className="mono" href={explorerAddr(DEPLOYMENT.chainId, token)} target="_blank" rel="noopener noreferrer">{shortAddr(token)}</a></li>}
         </ul>

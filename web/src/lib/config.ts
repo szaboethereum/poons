@@ -11,5 +11,7 @@ export const PONS_URL = DEPLOYMENT.token
   ? `https://www.ponsfamily.com/launchpad/${DEPLOYMENT.token}`
   : 'https://www.ponsfamily.com/launchpad';
 
+export const OPENSEA_URL = 'https://opensea.io/collection/poons-rh';
+
 /** Generated data is only ever used when a local build asks for it explicitly. */
 export const DEMO = import.meta.env.DEV && import.meta.env.VITE_DEMO === '1';
