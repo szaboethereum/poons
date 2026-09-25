@@ -39,11 +39,15 @@ export class Watcher {
     Object.assign(this, { client, ctx, ledger, price, opts, onQueued });
     for (const p of JSON.parse(ledger.get('pools') ?? '[]')) this.addPool(p);
     for (const a of JSON.parse(ledger.get('infra') ?? '[]')) this.ctx.infra.add(a);
-    this.graduated = ledger.get('graduated') === '1';
+    // 'graduated2': the old 'graduated' flag fired on any PoolManager touch, including third-party pools.
+    this.graduated = ledger.get('graduated2') === '1';
+    this.#pmTouched = this.graduated || ledger.get('pm_touched') === '1';
   }
 
-  /** True once the token trades on its v4 pool; only then do we pay for the extra Swap query. */
+  /** True once our own Pons v4 pool exists (Initialize or Swap with our pool id). */
   graduated = false;
+  /** The token has moved through the PoolManager (our pool or anyone's); only then do we pay for the v4 query. */
+  #pmTouched = false;
 
   #rememberInfra(addrs: string[]) {
     if (!addrs.length) return;
@@ -105,12 +109,20 @@ export class Watcher {
     const v = this.ctx.v4;
     if (v) {
       const pmPad = pad(v.poolManager);
-      if (!this.graduated && tok.some(l => l.topics[1] === pmPad || l.topics[2] === pmPad)) {
-        this.graduated = true;
-        this.ledger.set('graduated', '1');
-        console.log('[watch] token graduated to its Uniswap v4 pool');
+      if (!this.#pmTouched && tok.some(l => l.topics[1] === pmPad || l.topics[2] === pmPad)) {
+        this.#pmTouched = true;
+        this.ledger.set('pm_touched', '1');
       }
-      if (this.graduated) v4 = await this.getLogs({ ...range, address: v.poolManager, topics: [TOPIC.V4Swap, v.poolId] });
+      // Anyone can open a v4 pool with our token, so graduation = our exact pool id showing up.
+      if (this.#pmTouched) {
+        const pmLogs = await this.getLogs({ ...range, address: v.poolManager, topics: [[TOPIC.V4Swap, TOPIC.V4Initialize], v.poolId] });
+        v4 = pmLogs.filter(l => l.topics[0] === TOPIC.V4Swap);
+        if (!this.graduated && pmLogs.length) {
+          this.graduated = true;
+          this.ledger.set('graduated2', '1');
+          console.log('[watch] token graduated to its Pons Uniswap v4 pool');
+        }
+      }
     }
     const rest = [...main.filter(l => l.address.toLowerCase() !== token), ...wIn, ...wOut, ...v4];
     return [...tok, ...rest.filter(l => ours.has(l.transactionHash.toLowerCase()))];

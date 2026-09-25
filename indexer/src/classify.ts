@@ -15,6 +15,7 @@ export const TOPIC = {
   CurveSell: '0x8113d738abdcb6b38357e9d53a54a7157861a09031b453651f0fe7fe151f59df',
   // Uniswap v4 PoolManager: Swap(bytes32 indexed id, address indexed sender, int128 amount0, int128 amount1, ...)
   V4Swap: '0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f',
+  V4Initialize: '0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438',
   // Pons factory: Launched(address indexed token, address indexed curve, address indexed deployer, ...)
   PonsLaunched: '0x8d4aad4953d0ca700d468f3753aa14432d1b35b43ec6409f051fb6aa43a89607',
 } as const;
