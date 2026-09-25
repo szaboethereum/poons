@@ -235,6 +235,11 @@ ul, ol { margin: 0; padding: 0; list-style: none; }
   color: var(--teal-900); padding: 10px var(--gutter); font-size: 14px; text-align: center;
 }
 @media (max-width: 600px) { .demo-banner { text-align: left; font-size: 13px; } }
+.mint-banner {
+  background: var(--surface-2); color: var(--ink); border-bottom: 1px solid var(--line);
+  padding: 10px var(--gutter); font-size: 14px; text-align: center;
+}
+@media (max-width: 600px) { .mint-banner { text-align: left; font-size: 13px; } }
 .demo-banner code { background: rgb(19 33 31 / .12); padding: 1px 5px; border-radius: 4px; word-break: break-all; }
 
 /* ==========================================================================

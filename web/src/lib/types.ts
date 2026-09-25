@@ -12,6 +12,10 @@ export interface Stats {
   /** Wallets whose best single buy was under the minimum. */
   belowMin?: number;
   soldOut?: boolean;
+  /** false until the owner opens minting on-chain (null = not checked yet). */
+  mintOpen?: boolean | null;
+  /** The token now trades on a DEX, so no new Founding Residents. */
+  graduated?: boolean;
 }
 
 /** 'queued' means the drop transaction is being sent right now. */

@@ -8,11 +8,12 @@ import { createPublicClient, createWalletClient, formatEther, http, parseAbi, pa
 import { generatePrivateKey, privateKeyToAccount } from 'viem/accounts';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 
-const env = (k: string) => { const v = process.env[k]; if (!v) throw new Error(`missing env ${k}`); return v; };
-if (env('NETWORK') !== 'testnet') throw new Error('simulate.ts only runs on testnet');
+const env = (k: string) => { const v = process.env[`${k}_TESTNET`] || process.env[k]; if (!v) throw new Error(`missing env ${k}_TESTNET`); return v; };
+if (process.env.NETWORK !== 'testnet') throw new Error('simulate.ts only runs with NETWORK=testnet');
 const chain = { id: 46630, name: 'Robinhood Chain Testnet', nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
   rpcUrls: { default: { http: [env('RPC_URLS').split(',')[0]] } } } as const;
 const pub = createPublicClient({ chain, transport: http() });
+if ((await pub.getChainId()) !== 46630) throw new Error('RPC_URLS_TESTNET does not point at Robinhood testnet (46630)');
 const funder = privateKeyToAccount(env('MINTER_KEY') as `0x${string}`);
 const curve = env('CURVE') as `0x${string}`, token = env('TOKEN') as `0x${string}`;
 const api = `http://localhost:${process.env.API_PORT || 8788}`;
@@ -32,7 +33,7 @@ const SCENARIOS = [
 ] as const;
 
 async function ethFor(usd: number) {
-  const price = process.env.ETH_USD ? Number(process.env.ETH_USD)
+  const price = process.env.ETH_USD_TESTNET ? Number(process.env.ETH_USD_TESTNET)
     : Number((await fetch('https://api.coinbase.com/v2/prices/ETH-USD/spot').then(r => r.json())).data.amount);
   // +2% so the post-fee value stays on the intended side of the $10 line
   return parseEther(((usd * 1.02) / price / 0.99).toFixed(18));
@@ -46,7 +47,7 @@ async function run() {
   const f = client(funder);
   const need = [12, 5, 12, 15, 12, 40, 0];
   for (let i = 0; i < accts.length; i++) {
-    const value = (need[i] ? await ethFor(need[i]) : 0n) + parseEther('0.0002');
+    const value = (need[i] ? await ethFor(need[i]) : 0n) + parseEther('0.00002');
     const h = await f.sendTransaction({ to: accts[i].address, value });
     await pub.waitForTransactionReceipt({ hash: h });
     console.log(`funded ${accts[i].address} with ${formatEther(value)} ETH (${SCENARIOS[i].name})`);

@@ -38,19 +38,21 @@ NODE_PATH=indexer/node_modules node art/parity.js   # chain SVG/rarity == JS, 96
 Pons is not deployed on testnet, so `DeployTestnet` also deploys `MockPonsCurve` + token, which emit the
 exact same events as the real Pons curve.
 ```sh
-# 1. fund MINTER_ADDRESS from .env with testnet ETH (faucet)
-cd contracts && ./deploy.sh testnet        # writes CURVE, TOKEN, POONS, START_BLOCK into ../.env
+# 1. fund MINTER_ADDRESS with testnet ETH; NETWORK=testnet in .env
+cd contracts && ./deploy.sh testnet        # writes *_TESTNET addresses into ../.env (mint starts CLOSED)
 cd ../indexer && npm install && npm start  # watcher + minter + API on :8788
 npm run simulate                           # 7 scenarios, one per rule (other terminal)
-npm run simulate -- check                  # a few seconds later: PASS/FAIL per rule
+cast send $POONS_TESTNET 'setMintOpen(bool)' true --private-key $MINTER_KEY --rpc-url <testnet rpc>
+npm run simulate -- check                  # queued wallets get their Poons within ~1 min of opening
 cd ../web && npm install && npm run dev    # http://localhost:5173
 ```
-Testnet ETH has no price, so `.env` pins `ETH_USD=100000` (a $10 test buy = 0.0001 ETH). Remove it on mainnet.
 
 ## Mainnet
-1. Put the paid RPC first in `RPC_URLS` (public one as fallback) and remove `ETH_USD`. The deployer wallet
-   owns the contract and receives creator fees.
-2. `cd contracts && ./deploy.sh mainnet` — deploy **before** launching the token, so `START_BLOCK` precedes the launch.
-3. Launch the token on ponsfamily.com, then set `TOKEN=` and `NETWORK=mainnet` in `.env`.
-4. `cd indexer && DRY_RUN=1 npm start` to watch it decide, then `npm start` for real.
-5. Watch `GET /api/health` (lag, last error, trades recovered by the re-scan).
+Config lives in the `*_MAINNET` block of `.env`; set `NETWORK=mainnet`. Every script refuses to run if the RPC
+isn't chain 4663.
+1. Fund `MINTER_ADDRESS` with a little ETH (deploy + drop gas). The deployer owns the contract and receives creator fees.
+2. `cd contracts && CONFIRM_MAINNET=yes ./deploy.sh mainnet` — minting starts **closed**.
+3. Launch the token on ponsfamily.com; put its address in `TOKEN_MAINNET` and its launch block in `START_BLOCK_MAINNET`.
+4. `cd indexer && DRY_RUN=1 npm start` to watch it decide, then `npm start`. Qualifying buys queue up while minting is closed.
+5. Open minting: `cast send $POONS_MAINNET 'setMintOpen(bool)' true --private-key $MINTER_KEY --rpc-url <mainnet rpc>`.
+6. Watch `GET /api/health` (lag, last error, RPC calls per minute).

@@ -6,6 +6,7 @@ import { usePoll } from './hooks/usePoll';
 import { useDemoMode } from './hooks/misc';
 import { Header } from './components/Header';
 import { DemoBanner } from './components/DemoBanner';
+import { MintStatusBanner } from './components/MintStatusBanner';
 import { WalletChecker } from './components/WalletChecker';
 import { LiveDrops } from './components/LiveDrops';
 import { Gallery } from './components/Gallery';
@@ -56,6 +57,7 @@ export default function App() {
       </a>
       <Header stats={stats.data} active={route.id} />
       {demo && <DemoBanner />}
+      {!demo && <MintStatusBanner stats={stats.data} />}
       <main id="main" tabIndex={-1} key={route.id}>{page}</main>
       <Footer stats={stats.data} demo={demo} />
       <PoonDetail drop={detail} chainId={chainId} onClose={() => setDetail(null)} />

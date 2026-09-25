@@ -7,9 +7,11 @@ import { Minter } from './minter.ts';
 import { startApi } from './api.ts';
 import { countRpc } from './rpc.ts';
 
+// Per-network settings live in .env as KEY_TESTNET / KEY_MAINNET; NETWORK picks the block.
+const NETWORK = process.env.NETWORK ?? 'testnet';
 const env = (k: string, d?: string) => {
-  const v = process.env[k] || d;
-  if (v === undefined) throw new Error(`missing env ${k}`);
+  const v = process.env[`${k}_${NETWORK.toUpperCase()}`] || process.env[k] || d;
+  if (v === undefined) throw new Error(`missing env ${k}_${NETWORK.toUpperCase()}`);
   return v;
 };
 
@@ -28,7 +30,7 @@ const NETWORKS = {
   },
 } as const;
 
-const net = NETWORKS[env('NETWORK', 'testnet') as keyof typeof NETWORKS];
+const net = NETWORKS[NETWORK as keyof typeof NETWORKS];
 if (!net) throw new Error('NETWORK must be mainnet or testnet');
 const rpcs = env('RPC_URLS', net.rpc).split(',').map(s => s.trim()).filter(Boolean);
 const chain = defineChain({
@@ -38,12 +40,17 @@ const chain = defineChain({
 // Every provider gets a turn: a flaky or rate-limited endpoint fails over to the next one.
 const transport = fallback(rpcs.map(u => http(u, { timeout: 8000, retryCount: 1, onFetchRequest: countRpc })), { rank: false, retryCount: 2 });
 const pub = createPublicClient({ chain, transport });
+// Refuse to run against the wrong network (e.g. a mainnet RPC with testnet settings).
+for (const u of rpcs) {
+  const id = await createPublicClient({ transport: http(u, { timeout: 8000 }) }).getChainId();
+  if (id !== net.id) throw new Error(`RPC ${u.replace(/\/v2\/.*/, '/v2/…')} is chain ${id}, but NETWORK=${NETWORK} expects ${net.id}`);
+}
 
 const token = env('TOKEN').toLowerCase();
 const curve = env('CURVE', net.curve).toLowerCase();
 const poons = env('POONS') as `0x${string}`;
 const ledger = new Ledger(env('DB', `poons-${net.id}.db`), Number(env('MIN_BUY_USD', '10')));
-const price = new EthUsd();
+const price = new EthUsd(process.env[`ETH_USD_${NETWORK.toUpperCase()}`]);
 await price.start();
 
 const pools = new Set<string>(env('POOLS', '').split(',').filter(Boolean).map(a => a.toLowerCase()));
@@ -59,10 +66,11 @@ const account = dryRun ? null : privateKeyToAccount(env('MINTER_KEY') as `0x${st
 const wallet = account ? createWalletClient({ chain, transport, account }) : null;
 const minter = new Minter(pub as any, wallet, account, poons, ledger, Number(env('MAX_BATCH', '120')));
 
+const wsUrl = env('WS_URL', '');
 const watcher = new Watcher(pub as any, ctx, ledger, price, {
   startBlock: BigInt(env('START_BLOCK')),
   pollMs: Number(env('POLL_MS', '250')),
-  idlePollMs: Number(env('IDLE_POLL_MS', process.env.WS_URL ? '5000' : '2000')),
+  idlePollMs: Number(env('IDLE_POLL_MS', wsUrl ? '5000' : '2000')),
   maxRange: BigInt(env('MAX_RANGE', '2000')),
   confirmations: BigInt(env('CONFIRMATIONS', '0')),
   rescanBlocks: BigInt(env('RESCAN_BLOCKS', '6000')), // ~10 minutes of blocks
@@ -70,9 +78,11 @@ const watcher = new Watcher(pub as any, ctx, ledger, price, {
 }, () => minter.kick());
 
 // Optional push trigger: a websocket log subscription on the token wakes the watcher instantly.
-if (process.env.WS_URL) {
+if (wsUrl) {
   const { webSocket } = await import('viem');
-  const ws = createPublicClient({ chain, transport: webSocket(process.env.WS_URL, { reconnect: true }) });
+  const ws = createPublicClient({ chain, transport: webSocket(wsUrl, { reconnect: true }) });
+  const wsId = await ws.getChainId();
+  if (wsId !== net.id) throw new Error(`WS_URL is chain ${wsId}, but NETWORK=${NETWORK} expects ${net.id}`);
   ws.watchEvent({ address: token as `0x${string}`, onLogs: logs => watcher.poke(logs.reduce((m, l) => (l.blockNumber && l.blockNumber > m ? l.blockNumber : m), 0n)), onError: e => console.error('[ws]', e.message) });
   console.log('[ws] subscribed to token logs');
 }

@@ -30,6 +30,13 @@ contract PoonsTest is Test {
 
     function setUp() public {
         poons = new Poons(owner, minter, 3333, address(0));
+        vm.prank(owner);
+        poons.setMintOpen(true);
+    }
+
+    function _open(Poons p) internal {
+        vm.prank(owner);
+        p.setMintOpen(true);
     }
 
     function _two(address a, address b) internal pure returns (Poons.Drop[] memory w) {
@@ -64,6 +71,7 @@ contract PoonsTest is Test {
 
     function test_capIsRespected() public {
         Poons small = new Poons(owner, minter, 2, address(0));
+        _open(small);
         Poons.Drop[] memory w = new Poons.Drop[](5);
         for (uint160 i; i < 5; ++i) w[i] = Poons.Drop(address(i + 10), false);
         vm.prank(minter);
@@ -139,6 +147,7 @@ contract PoonsTest is Test {
         address seaport = address(0x5EA);
         address otherMarket = address(0xB1);
         Poons p = new Poons(owner, minter, 3333, address(new MockValidator(seaport)));
+        _open(p);
         vm.prank(minter);
         p.drop(_two(alice, bob)); // mints are never validated
 
@@ -156,6 +165,29 @@ contract PoonsTest is Test {
         vm.prank(seaport);
         p.transferFrom(bob, address(0xBEEF), 2); // fee-enforcing marketplace: allowed
         assertEq(p.ownerOf(2), address(0xBEEF));
+    }
+
+    function test_mintStartsClosedAndOnlyOwnerOpens() public {
+        Poons fresh = new Poons(owner, minter, 3333, address(0));
+        assertFalse(fresh.mintOpen());
+        vm.prank(minter);
+        vm.expectRevert(Poons.MintClosed.selector);
+        fresh.drop(_two(alice, bob));
+
+        vm.prank(minter);
+        vm.expectRevert();
+        fresh.setMintOpen(true); // the minter can't open it
+
+        _open(fresh);
+        vm.prank(minter);
+        fresh.drop(_two(alice, bob));
+        assertEq(fresh.totalSupply(), 2);
+
+        vm.prank(owner);
+        fresh.setMintOpen(false); // and it can be paused again
+        vm.prank(minter);
+        vm.expectRevert(Poons.MintClosed.selector);
+        fresh.drop(_two(address(0x3), address(0x4)));
     }
 
     function test_founderFlagLivesInSeedBit255() public {

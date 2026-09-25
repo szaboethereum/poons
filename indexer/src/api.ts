@@ -12,7 +12,7 @@ export type ApiInfo = { chainId: number; token: string; poons: string; ponsUrl: 
 export function startApi(port: number, ledger: Ledger, watcher: Watcher, minter: Minter, info: ApiInfo) {
   const routes: [RegExp, (m: RegExpMatchArray, q: URLSearchParams) => unknown][] = [
     [/^\/api\/stats$/, () => ({
-      ...info, ...ledger.stats(), soldOut: minter.soldOut, updatedAt: Math.floor(Date.now() / 1000),
+      ...info, ...ledger.stats(), soldOut: minter.soldOut, mintOpen: minter.dryRun ? true : minter.mintOpen, updatedAt: Math.floor(Date.now() / 1000),
       // Graduated = the token trades on a DEX pool now, so no new Founding Residents.
       graduated: watcher.ctx.pools.size > 0,
     })],

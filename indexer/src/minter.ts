@@ -12,6 +12,7 @@ export const POONS_ABI = [
   { type: 'function', name: 'seedOf', stateMutability: 'view', inputs: [{ type: 'uint256' }], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'totalSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
   { type: 'function', name: 'maxSupply', stateMutability: 'view', inputs: [], outputs: [{ type: 'uint256' }] },
+  { type: 'function', name: 'mintOpen', stateMutability: 'view', inputs: [], outputs: [{ type: 'bool' }] },
   { type: 'event', name: 'Dropped', inputs: [
     { name: 'to', type: 'address', indexed: true }, { name: 'tokenId', type: 'uint256', indexed: true },
     { name: 'seed', type: 'uint256', indexed: false }] },
@@ -25,6 +26,9 @@ export class Minter {
   pub: PublicClient; wallet: WalletClient | null; account: Account | null; poons: `0x${string}`;
   ledger: Ledger; maxBatch: number;
   soldOut = false;
+  /** null until first checked. While closed, buys keep qualifying and wait in the queue. */
+  mintOpen: boolean | null = null;
+  #mintCheckedAt = 0;
   #maxSupply: bigint | null = null;
 
   constructor(pub: PublicClient, wallet: WalletClient | null, account: Account | null, poons: `0x${string}`,
@@ -34,6 +38,16 @@ export class Minter {
 
   get dryRun() { return this.wallet === null; }
   kick() { this.wake?.(); }
+
+  /** Reads the on-chain switch at most once a minute while closed (no RPC churn during a pause). */
+  async #isOpen(): Promise<boolean> {
+    if (this.mintOpen || Date.now() - this.#mintCheckedAt < 60_000) return this.mintOpen === true;
+    this.#mintCheckedAt = Date.now();
+    const open = await this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'mintOpen' });
+    if (open !== this.mintOpen) console.log(`[mint] minting is ${open ? 'OPEN' : 'closed — qualifying buys are queued until it opens'}`);
+    this.mintOpen = open;
+    return open;
+  }
 
   /** Trust the chain: a wallet the contract already served is recorded as minted. */
   async reconcile(wallets: string[]) {
@@ -49,6 +63,7 @@ export class Minter {
   }
 
   async run() {
+    if (!this.dryRun) await this.#isOpen().catch(() => {});
     if (!this.dryRun) console.log(`[mint] reconciled ${await this.reconcile(this.ledger.queue(100_000).map(q => q.address))} wallet(s) already served on-chain`);
     for (;;) {
       const batch = this.soldOut ? [] : this.ledger.queue(this.maxBatch);
@@ -68,6 +83,11 @@ export class Minter {
         continue;
       }
       try {
+        if (!(await this.#isOpen())) {
+          await new Promise<void>(r => { this.wake = r; setTimeout(r, 60_000); });
+          this.wake = null;
+          continue;
+        }
         this.#maxSupply ??= await this.pub.readContract({ address: this.poons, abi: POONS_ABI, functionName: 'maxSupply' });
         if (BigInt(this.ledger.tokens(0, 1).total) >= this.#maxSupply) { this.soldOut = true; console.log('[mint] max supply reached — minting stopped'); continue; }
 
@@ -95,6 +115,7 @@ export class Minter {
         console.log(`[mint] ${minted} Poon(s) in ${Date.now() - t0}ms ${hash}`);
       } catch (e: any) {
         console.error('[mint]', e.shortMessage ?? e.message);
+        if (/MintClosed/.test(`${e.message} ${e.shortMessage ?? ''}`)) { this.mintOpen = false; this.#mintCheckedAt = Date.now(); continue; }
         await sleep(1500);
         await this.reconcile(batch.map(q => q.address)).catch(() => {});
       }

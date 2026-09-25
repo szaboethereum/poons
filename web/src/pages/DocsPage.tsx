@@ -91,7 +91,7 @@ export function DocsPage({ stats, sub }: { stats: Stats | undefined; sub: string
           </Section>
 
           <Section id="founders" title="Founding Resident">
-            <p>If your qualifying buy happened on the Pons bonding curve, before the token graduated, your Poon is a <strong>Founding Resident</strong>. The flag is stored in bit 255 of the seed. Traits only read the low bits, so the flag doesn't change a Poon's traits; the renderer adds a small gold star to the art, and the metadata lists it as a Status trait.</p>
+            <p>If your qualifying buy happened on the Pons bonding curve, before the token graduated, your Poon is a <strong>Founding Resident</strong>. The flag is stored in bit 255 of the seed. Traits only read the low bits, so the flag doesn't change a Poon's traits; the renderer adds a small gold star to the art, and the metadata carries a <code>Founding Resident: Yes</code> attribute.</p>
           </Section>
 
           <Section id="art" title="On-chain art">

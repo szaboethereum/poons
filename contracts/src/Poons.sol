@@ -52,6 +52,9 @@ contract Poons is ERC721, OwnableRoles, ICreatorToken {
     IPoonsRenderer public renderer;
     bool public rendererLocked;
 
+    /// @notice Minting starts closed at deploy; the owner opens it with `setMintOpen(true)`.
+    bool public mintOpen;
+
     /// @notice 5% creator fee on secondary sales.
     uint256 public constant ROYALTY_BPS = 500;
     /// @notice Receives the creator fee. Starts as the owner; can later point to a treasury contract
@@ -63,10 +66,12 @@ contract Poons is ERC721, OwnableRoles, ICreatorToken {
     event RendererSet(address renderer);
     event RendererLocked();
     event RoyaltyReceiverSet(address receiver);
+    event MintOpenSet(bool open);
     /// @dev EIP-4906 so marketplaces refresh art after a renderer change.
     event BatchMetadataUpdate(uint256 fromTokenId, uint256 toTokenId);
 
     error RendererIsLocked();
+    error MintClosed();
 
     /// @param validator OpenSea's transfer validator (0xA000027A9B2802E1ddf7000061001e5c005A0000 on
     ///        Robinhood Chain mainnet) or address(0) where it isn't deployed (testnet).
@@ -90,6 +95,7 @@ contract Poons is ERC721, OwnableRoles, ICreatorToken {
     /// @notice Batch airdrop, one Poon per wallet. Wallets that already received one are skipped
     ///         (never reverted), so retries are safe and one stale entry can't block a batch.
     function drop(Drop[] calldata drops) external onlyRoles(MINTER_ROLE) {
+        if (!mintOpen) revert MintClosed();
         uint256 id = totalSupply;
         uint256 cap = maxSupply;
         bytes32 entropy = blockhash(block.number - 1);
@@ -108,6 +114,11 @@ contract Poons is ERC721, OwnableRoles, ICreatorToken {
             emit Dropped(to, id, seed);
         }
         totalSupply = id;
+    }
+
+    function setMintOpen(bool open) external onlyOwner {
+        mintOpen = open;
+        emit MintOpenSet(open);
     }
 
     function tokenURI(uint256 id) public view override returns (string memory) {

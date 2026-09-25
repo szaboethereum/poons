@@ -10,11 +10,16 @@ export class EthUsd {
   value = 0;
   at = 0;
   maxAgeMs: number;
-  constructor(maxAgeMs = 120_000) { this.maxAgeMs = maxAgeMs; }
+  fixed: number | null;
+  /** @param fixed pin a price (testnet ETH has no market price); omit on mainnet */
+  constructor(fixed?: string, maxAgeMs = 120_000) {
+    this.fixed = fixed ? Number(fixed) : null;
+    this.maxAgeMs = maxAgeMs;
+  }
 
   async refresh() {
     // Testnet ETH has no market price: ETH_USD pins one so test buys can be sized in dollars.
-    if (process.env.ETH_USD) { this.value = Number(process.env.ETH_USD); this.at = Date.now(); return; }
+    if (this.fixed) { this.value = this.fixed; this.at = Date.now(); return; }
     const got = await Promise.all(SOURCES.map(async ([url, pick]) => {
       try {
         const r = await fetch(url, { signal: AbortSignal.timeout(4000) });
