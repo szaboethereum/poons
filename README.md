@@ -20,6 +20,16 @@ Clone with submodules (Foundry libraries): `git clone --recursive …`, or `git 
 
 Secrets and config live in one file: `.env` at the repo root (see `.env.example`). Never commit it.
 
+## Mainnet deployment (Robinhood Chain, 4663)
+| Contract | Address |
+| --- | --- |
+| Poons (ERC721) | `0xD71500d59Ab6eB99cA7074EfD042B8bAee9bF2B2` |
+| PoonsRenderer | `0x8515a1ECa608Ec6f0249D87722661e7Ab31788aE` |
+| PoonsData (library) | `0xa6656792Bd6821CA165E34c7e11516658F37Bc4C` |
+
+Owner / creator fees `0x2FBD806fBf4396FF3ab12CBa355b803404Ca2841` · minter `0x0129eDd7FF9d526188DD7E2085fc0eB87988c9Cf` ·
+minting starts closed · source verified on [Sourcify](https://sourcify.dev).
+
 ## Contract checks
 ```sh
 cd contracts && forge test && forge build --sizes      # every contract must stay under 24 KB
