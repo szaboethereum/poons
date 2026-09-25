@@ -38,6 +38,18 @@ export class Watcher {
   constructor(client: PublicClient, ctx: Ctx, ledger: Ledger, price: EthUsd, opts: WatcherOpts, onQueued: () => void) {
     Object.assign(this, { client, ctx, ledger, price, opts, onQueued });
     for (const p of JSON.parse(ledger.get('pools') ?? '[]')) this.addPool(p);
+    for (const a of JSON.parse(ledger.get('infra') ?? '[]')) this.ctx.infra.add(a);
+    this.graduated = ledger.get('graduated') === '1';
+  }
+
+  /** True once the token trades on its v4 pool; only then do we pay for the extra Swap query. */
+  graduated = false;
+
+  #rememberInfra(addrs: string[]) {
+    if (!addrs.length) return;
+    const all = new Set([...JSON.parse(this.ledger.get('infra') ?? '[]'), ...addrs]);
+    this.ledger.set('infra', JSON.stringify([...all]));
+    console.log(`[watch] infra learned: ${addrs.join(', ')}`);
   }
 
   addPool(p: string) {
@@ -52,16 +64,28 @@ export class Watcher {
     const raw = await this.client.request({ method: 'eth_getLogs', params: [filter as any] }) as any[];
     const logs = raw.map(l => ({ address: l.address, topics: l.topics, data: l.data, transactionHash: l.transactionHash,
       logIndex: Number(l.logIndex), blockNumber: BigInt(l.blockNumber), time: Number(l.blockTimestamp ?? 0) }));
-    // Nitro only includes blockTimestamp for some blocks; the hold rule needs real time, so fill gaps.
-    const missing = [...new Set(logs.filter(l => !l.time).map(l => l.blockNumber))];
-    await Promise.all(missing.map(async b => {
-      if (!this.#blockTime.has(b)) this.#blockTime.set(b, Number((await this.client.getBlock({ blockNumber: b })).timestamp));
-    }));
-    for (const l of logs) if (!l.time) l.time = this.#blockTime.get(l.blockNumber)!;
-    if (this.#blockTime.size > 50_000) this.#blockTime.clear();
+    // Some providers (Alchemy) omit blockTimestamp. Instead of one getBlock per block, read the two
+    // ends of the queried range (cached) and interpolate: exact in live mode, ~seconds in backfills.
+    if (logs.some(l => !l.time)) {
+      const f = (filter as any), from = BigInt(f.fromBlock), to = BigInt(f.toBlock);
+      const [t0, t1] = await Promise.all([this.#timeAt(from), this.#timeAt(to)]);
+      for (const l of logs) if (!l.time) {
+        l.time = to === from ? t1 : Math.round(t0 + (t1 - t0) * Number(l.blockNumber - from) / Number(to - from));
+      }
+    }
     return logs;
   }
+
   #blockTime = new Map<bigint, number>();
+  async #timeAt(b: bigint): Promise<number> {
+    let t = this.#blockTime.get(b);
+    if (t === undefined) {
+      t = Number((await this.client.getBlock({ blockNumber: b })).timestamp);
+      if (this.#blockTime.size > 1000) this.#blockTime.clear();
+      this.#blockTime.set(b, t);
+    }
+    return t;
+  }
 
   async fetch(from: bigint, to: bigint): Promise<Log[]> {
     const range = { fromBlock: hex(from), toBlock: hex(to) };
@@ -76,7 +100,19 @@ export class Watcher {
     const token = this.ctx.token.toLowerCase();
     const tok = main.filter(l => l.address.toLowerCase() === token && l.topics[0] === TOPIC.Transfer);
     const ours = new Set(tok.map(l => l.transactionHash.toLowerCase()));
-    const rest = [...main.filter(l => l.address.toLowerCase() !== token), ...wIn, ...wOut];
+    // v4 swaps are only fetched once the token has touched the PoolManager (i.e. graduated).
+    let v4: Log[] = [];
+    const v = this.ctx.v4;
+    if (v) {
+      const pmPad = pad(v.poolManager);
+      if (!this.graduated && tok.some(l => l.topics[1] === pmPad || l.topics[2] === pmPad)) {
+        this.graduated = true;
+        this.ledger.set('graduated', '1');
+        console.log('[watch] token graduated to its Uniswap v4 pool');
+      }
+      if (this.graduated) v4 = await this.getLogs({ ...range, address: v.poolManager, topics: [TOPIC.V4Swap, v.poolId] });
+    }
+    const rest = [...main.filter(l => l.address.toLowerCase() !== token), ...wIn, ...wOut, ...v4];
     return [...tok, ...rest.filter(l => ours.has(l.transactionHash.toLowerCase()))];
   }
 
@@ -111,9 +147,12 @@ export class Watcher {
 
   /** Reads and classifies [from, to], discovering a graduated pool on the way if needed. */
   async read(from: bigint, to: bigint, lastPrice: bigint) {
-    let res = classify(this.ctx, await this.fetch(from, to), lastPrice);
+    const logs = await this.fetch(from, to);
+    let res = classify(this.ctx, logs, lastPrice);
+    // Infra learned mid-range (graduation) may have been credited earlier in the same range: redo.
+    if (res.newInfra.length) { this.#rememberInfra(res.newInfra); res = classify(this.ctx, logs, lastPrice); }
     const unexplained = [...new Set(res.trades.filter(t => t.kind === 'in').map(t => t.tx))];
-    if (unexplained.length && await this.discoverPools(unexplained)) res = classify(this.ctx, await this.fetch(from, to), lastPrice);
+    if (unexplained.length && !this.ctx.v4 && await this.discoverPools(unexplained)) res = classify(this.ctx, await this.fetch(from, to), lastPrice);
     return res;
   }
 
@@ -167,6 +206,13 @@ export class Watcher {
         if (queued) this.onQueued();
         if (head - cursor < 50n) await this.#pause(); // caught up: wait for the next tick instead of spinning
       } catch (e: any) {
+        const msg = `${e.shortMessage ?? ''} ${e.details ?? ''} ${e.message ?? ''}`;
+        if (/beyond current head|block range extends/i.test(msg)) {
+          // The websocket saw a block the HTTP node doesn't have yet: not an error, just retry.
+          this.#headHint = 0n;
+          await sleep(150);
+          continue;
+        }
         this.#error('watch', e);
         if (range > 1n) range /= 2n;
         await sleep(500);

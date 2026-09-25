@@ -139,11 +139,28 @@ function StatusCard({ r, stats, onOpen }: { r: WalletStatus; stats: Stats | unde
         </div>
       );
     case 'queued':
+      if (stats?.mintOpen === false) {
+        return (
+          <div className="status status--queued">
+            <p className="status__tag">In line</p>
+            <h3>You're on the list</h3>
+            <p>Your buy qualified. Minting hasn't opened yet; your Poon drops to {addr} the moment it does. Nothing else to do.</p>
+          </div>
+        );
+      }
       return (
         <div className="status status--queued">
           <p className="status__tag"><span className="spinner" aria-hidden="true" /> Dropping</p>
           <h3>Your Poon is on its way</h3>
           <p>Your buy qualified and the drop transaction to {addr} is being sent right now. This page updates as soon as it lands.</p>
+        </div>
+      );
+    case 'sold_out':
+      return (
+        <div className="status status--out">
+          <p className="status__tag">Sold out</p>
+          <h3>All 3,333 Poons have dropped</h3>
+          <p>Your buy qualified, but it came after the last Poon was dropped. You can still pick one up on OpenSea.</p>
         </div>
       );
     case 'minted': {

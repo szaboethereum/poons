@@ -26,6 +26,9 @@ export class Minter {
   pub: PublicClient; wallet: WalletClient | null; account: Account | null; poons: `0x${string}`;
   ledger: Ledger; maxBatch: number;
   soldOut = false;
+  /** Minter wallet balance, refreshed every 5 minutes (one eth_getBalance), so gas never silently runs out. */
+  balanceEth: number | null = null;
+  lowBalanceEth = Number(process.env.LOW_BALANCE_ETH ?? '0.003');
   /** null until first checked. While closed, buys keep qualifying and wait in the queue. */
   mintOpen: boolean | null = null;
   #mintCheckedAt = 0;
@@ -62,7 +65,20 @@ export class Minter {
     return fixed;
   }
 
+  #watchBalance() {
+    if (this.dryRun || !this.account) return;
+    const tick = async () => {
+      try {
+        this.balanceEth = Number(await this.pub.getBalance({ address: this.account!.address })) / 1e18;
+        if (this.balanceEth < this.lowBalanceEth) console.warn(`[mint] LOW GAS: minter has ${this.balanceEth.toFixed(5)} ETH`);
+      } catch { /* next tick */ }
+    };
+    tick();
+    setInterval(tick, 300_000).unref();
+  }
+
   async run() {
+    this.#watchBalance();
     if (!this.dryRun) await this.#isOpen().catch(() => {});
     if (!this.dryRun) console.log(`[mint] reconciled ${await this.reconcile(this.ledger.queue(100_000).map(q => q.address))} wallet(s) already served on-chain`);
     for (;;) {

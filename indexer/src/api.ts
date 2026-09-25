@@ -14,13 +14,14 @@ export function startApi(port: number, ledger: Ledger, watcher: Watcher, minter:
     [/^\/api\/stats$/, () => ({
       ...info, ...ledger.stats(), soldOut: minter.soldOut, mintOpen: minter.dryRun ? true : minter.mintOpen, updatedAt: Math.floor(Date.now() / 1000),
       // Graduated = the token trades on a DEX pool now, so no new Founding Residents.
-      graduated: watcher.ctx.pools.size > 0,
+      graduated: watcher.graduated || watcher.ctx.pools.size > 0,
     })],
     [/^\/api\/wallet\/(0x[0-9a-fA-F]{40})$/, m => {
       const w = ledger.row(m[1]);
       return {
         address: m[1].toLowerCase(),
-        status: ledger.status(w),
+        // Qualified after the last Poon dropped: say so instead of "queued" forever.
+        status: minter.soldOut && ledger.status(w) === 'queued' ? 'sold_out' : ledger.status(w),
         bestBuyUsd: (w?.best_buy_usd6 ?? 0) / 1e6,
         qualifiedAt: w?.qualified_at ?? null,
         tokenId: w?.token_id ?? null,
@@ -40,7 +41,9 @@ export function startApi(port: number, ledger: Ledger, watcher: Watcher, minter:
     [/^\/api\/seeds$/, () => ({ seeds: ledger.seeds() })],
     [/^\/api\/health$/, () => {
       const h = watcher.health;
-      return { ok: h.head - h.cursor < 600n && Date.now() - h.lastErrorAt > 60_000, lagBlocks: Number(h.head - h.cursor),
+      const lowGas = minter.balanceEth !== null && minter.balanceEth < minter.lowBalanceEth;
+      return { ok: h.head - h.cursor < 600n && Date.now() - h.lastErrorAt > 60_000 && !lowGas, lagBlocks: Number(h.head - h.cursor),
+        minter: { balanceEth: minter.balanceEth, lowBalance: lowGas },
         head: Number(h.head), cursor: Number(h.cursor), lastError: h.lastError || null, rescans: h.rescans, recoveredTrades: h.recovered,
         rpc: { total: rpcStats.total, perMinute: Math.round(rpcStats.total / Math.max(1, (Date.now() - rpcStats.since) / 60_000)), byMethod: rpcStats.byMethod } };
     }],

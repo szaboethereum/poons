@@ -19,7 +19,7 @@ export interface Stats {
 }
 
 /** 'queued' means the drop transaction is being sent right now. */
-export type WalletStatusKind = 'none' | 'below_min' | 'queued' | 'minted';
+export type WalletStatusKind = 'none' | 'below_min' | 'queued' | 'minted' | 'sold_out';
 
 export interface WalletStatus {
   address: string;
