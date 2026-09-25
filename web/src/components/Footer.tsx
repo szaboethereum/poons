@@ -1,6 +1,6 @@
 import { explorerAddr, shortAddr } from '../lib/format';
 import { DEPLOYMENT, PONS_URL } from '../lib/config';
-import { ROUTES, href } from '../lib/router';
+import { ROUTES, href, isSoon } from '../lib/router';
 import type { Stats } from '../lib/types';
 import { Logo } from './Logo';
 
@@ -16,7 +16,7 @@ export function Footer({ stats, demo }: { stats: Stats | undefined; demo: boolea
         </div>
         <nav aria-label="Footer">
           <ul className="site-footer__links">
-            {ROUTES.filter((r) => r.id !== 'home').map((r) => <li key={r.id}><a href={href(r.id)}>{r.label}</a></li>)}
+            {ROUTES.filter((r) => r.id !== 'home').map((r) => <li key={r.id}>{isSoon(r) ? <span className="nav-soon" aria-disabled="true">{r.label} <span className="nav-soon__tag">soon</span></span> : <a href={href(r.id)}>{r.label}</a>}</li>)}
           </ul>
         </nav>
         <ul className="site-footer__meta">

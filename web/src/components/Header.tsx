@@ -4,6 +4,7 @@ import type { Stats } from '../lib/types';
 import { num } from '../lib/format';
 import { ROUTES, href, type RouteId } from '../lib/router';
 import { Logo } from './Logo';
+import { NavItem } from './NavItem';
 
 export function Header({ stats, active }: { stats: Stats | undefined; active: RouteId }) {
   const [open, setOpen] = useState(false);
@@ -28,7 +29,7 @@ export function Header({ stats, active }: { stats: Stats | undefined; active: Ro
           <ul className="nav__list">
             {links.map((r) => (
               <li key={r.id}>
-                <a className="nav__link" href={href(r.id)} aria-current={active === r.id ? 'page' : undefined}>{r.label}</a>
+                <NavItem r={r} active={active} className="nav__link" />
               </li>
             ))}
           </ul>
@@ -57,7 +58,7 @@ export function Header({ stats, active }: { stats: Stats | undefined; active: Ro
           <ul className="wrap">
             {ROUTES.map((r) => (
               <li key={r.id}>
-                <a href={href(r.id)} aria-current={active === r.id ? 'page' : undefined}>{r.label}</a>
+                <NavItem r={r} active={active} />
               </li>
             ))}
           </ul>

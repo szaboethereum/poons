@@ -8,10 +8,13 @@ export const ROUTES = [
   { id: 'gallery', path: 'gallery', label: 'Gallery', title: 'Gallery · Poons' },
   { id: 'rarity', path: 'rarity', label: 'Rarity', title: 'Rarity · Poons' },
   { id: 'stats', path: 'stats', label: 'Stats', title: 'Stats · Poons' },
-  { id: 'roadmap', path: 'roadmap', label: 'Roadmap', title: 'Roadmap · Poons' },
+  { id: 'roadmap', path: 'roadmap', label: 'Roadmap', title: 'Roadmap · Poons', soon: true },
   { id: 'docs', path: 'docs', label: 'Docs', title: 'Docs · Poons' },
   { id: 'faq', path: 'faq', label: 'FAQ', title: 'FAQ · Poons' },
 ] as const;
+
+/** Routes shown in navigation but not open yet. */
+export const isSoon = (r: (typeof ROUTES)[number]) => 'soon' in r && r.soon;
 
 export type RouteId = (typeof ROUTES)[number]['id'] | 'notfound';
 export interface Route { id: RouteId; sub: string | null }

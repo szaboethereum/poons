@@ -19,7 +19,6 @@ import { PoonDetail } from './components/PoonDetail';
 import { Page } from './components/Page';
 import { HomePage } from './pages/HomePage';
 import { StatsPage } from './pages/StatsPage';
-import { RoadmapPage } from './pages/RoadmapPage';
 import { DocsPage } from './pages/DocsPage';
 
 export default function App() {
@@ -42,7 +41,7 @@ export default function App() {
     case 'gallery': page = <Gallery key={demo ? 'demo' : 'live'} onOpen={open} latestId={drops?.[0]?.tokenId} />; break;
     case 'rarity': page = <RarityTable maxSupply={stats.data?.maxSupply ?? 3333} />; break;
     case 'stats': page = <StatsPage />; break;
-    case 'roadmap': page = <RoadmapPage />; break;
+    case 'roadmap': page = <Page title="Roadmap" sub="Coming soon."><p><a className="btn btn--ghost" href={href('home')}>Back home</a></p></Page>; break;
     case 'docs': page = <DocsPage stats={stats.data} sub={route.sub} />; break;
     case 'faq': page = <Faq stats={stats.data} />; break;
     default:
