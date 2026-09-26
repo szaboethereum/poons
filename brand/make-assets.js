@@ -172,6 +172,90 @@ function poonCanvas(seed) {
   return cv;
 }
 
+// ---------------------------------------------------------------- phase 1 announcement (160x90 cells, 10px = 1600x900)
+// 5x7 pixel font, only the glyphs the card needs.
+const FONT = {
+  A: ['01110','10001','10001','11111','10001','10001','10001'], B: ['11110','10001','10001','11110','10001','10001','11110'],
+  C: ['01111','10000','10000','10000','10000','10000','01111'], D: ['11110','10001','10001','10001','10001','10001','11110'],
+  E: ['11111','10000','10000','11110','10000','10000','11111'], G: ['01111','10000','10000','10011','10001','10001','01111'],
+  H: ['10001','10001','10001','11111','10001','10001','10001'], I: ['11111','00100','00100','00100','00100','00100','11111'],
+  M: ['10001','11011','10101','10101','10001','10001','10001'], N: ['10001','11001','10101','10011','10001','10001','10001'],
+  O: ['01110','10001','10001','10001','10001','10001','01110'], P: ['11110','10001','10001','11110','10000','10000','10000'],
+  R: ['11110','10001','10001','11110','10100','10010','10001'], S: ['01111','10000','10000','01110','00001','00001','11110'],
+  T: ['11111','00100','00100','00100','00100','00100','00100'], V: ['10001','10001','10001','10001','10001','01010','00100'],
+  Y: ['10001','10001','01010','00100','00100','00100','00100'], 1: ['00100','01100','00100','00100','00100','00100','01110'],
+  '.': ['00000','00000','00000','00000','00000','00000','00100'], ' ': ['00000','00000','00000','00000','00000','00000','00000'],
+};
+const textWidth = (str, k) => str.length * 6 * k - k;
+function text(cv, str, x0, y0, k, col, shadow) {
+  [...str].forEach((ch, i) => (FONT[ch] || FONT[' ']).forEach((row, y) => [...row].forEach((b, x) => {
+    if (b !== '1') return;
+    for (let dy = 0; dy < k; dy++) for (let dx = 0; dx < k; dx++) {
+      const px = x0 + (i * 6 + x) * k + dx, py = y0 + y * k + dy;
+      if (shadow) cv.set(px + k, py + k, shadow);
+      cv.set(px, py, col);
+    }
+  })));
+  // shadows were drawn under later glyph cells; redraw the face on top
+  if (shadow) text(cv, str, x0, y0, k, col, null);
+}
+
+function phase1() {
+  const W = 160, H = 90, GROUND = 86;
+  const cv = canvas(W, H);
+  const sky = ['#10152a', '#141a2e', '#1a2340', '#1f2946', '#1d3440', '#17312f'];
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
+    const t = (y / GROUND) * (sky.length - 1), i = Math.min(sky.length - 2, Math.floor(t));
+    cv.c[y][x] = (t - i) > bayer(x, y) ? sky[i + 1] : sky[i];
+  }
+  let v = 0xbeef01; const r = () => { v ^= v << 13; v >>>= 0; v ^= v >>> 17; v ^= v << 5; v >>>= 0; return v / 4294967296; };
+  // stars, kept clear of the text block so none reads as punctuation
+  for (let i = 0; i < 90; i++) {
+    const x = Math.floor(r() * W), y = Math.floor(r() * 50), c = r() < .2 ? '#f4e3a1' : '#5d668c';
+    if (y >= 3 && y <= 46 && x >= 4 && x <= W - 5) continue;
+    cv.set(x, y, c);
+  }
+  for (let y = GROUND; y < H; y++) for (let x = 0; x < W; x++) cv.c[y][x] = y === GROUND ? '#3f8a5f' : '#2a6446';
+
+  // headline
+  const gold = '#f4c542', cream = '#f1ead2', muted = '#9aa3c7', shade = '#0b0e1c';
+  text(cv, 'PHASE 1', Math.floor((W - textWidth('PHASE 1', 2)) / 2), 6, 2, gold, shade);
+  const sub = 'THE NEIGHBORHOOD ECONOMY';
+  text(cv, sub, Math.floor((W - textWidth(sub, 1)) / 2), 25, 1, cream, shade);
+  const items = ['RENT', 'RENOVATIONS', 'DEEDS'], gap = 9;
+  let ix = Math.floor((W - (items.reduce((a, t) => a + textWidth(t, 1), 0) + gap * (items.length - 1))) / 2);
+  items.forEach((t, i) => {
+    text(cv, t, ix, 36, 1, muted, null);
+    ix += textWidth(t, 1);
+    if (i < items.length - 1) { const d = ix + Math.floor(gap / 2) - 1; cv.set(d, 39, gold); cv.set(d + 1, 39, gold); cv.set(d, 40, gold); cv.set(d + 1, 40, gold); ix += gap; }
+  });
+
+  // a row of Poons on the street
+  const picks = [
+    { Body: 'Felt Blue', Roof: 'Forest', Topper: 'Golden Pup', Glasses: 'Classic Black', Shirt: 'Blue Plaid', Item: 'Coffee', Smoke: 'Puffs' },
+    { Body: 'Rose', Roof: 'Brick', Topper: 'Duckling', Glasses: 'Round Black', Shirt: 'Breton Stripe', Item: 'Sunflower', Smoke: 'Hearts' },
+    { Body: 'Mint', Roof: 'Navy', Topper: 'Ginger Cat', Glasses: 'Gold Wire', Shirt: 'Cable Knit', Item: 'Pons Flag', Smoke: 'Stars' },
+    { Body: 'Butter', Roof: 'Plum', Topper: 'Frog', Glasses: 'Tortoise', Shirt: 'Overalls', Item: 'Balloon', Smoke: 'Notes' },
+  ];
+  const BG = new Set([A.S.BG_A, A.S.BG_B, A.S.GLOW]);
+  picks.forEach((p, i) => {
+    const o = {}; for (const [k, name] of Object.entries(p)) o[k] = idxOf(k, name);
+    const s = seedFor(o) | (1n << 255n); // founding residents
+    const idx = A.traitsFor(s), g = A.slotGrid(idx, true), pal = A.palette(idx);
+    const x0 = 6 + i * 38, y0 = GROUND - 32;
+    for (let y = 0; y < 32; y++) for (let x = 0; x < 32; x++) {
+      const slot = g[y * 32 + x];
+      if (!BG.has(slot)) cv.set(x0 + x, y0 + y, pal[slot]);
+    }
+  });
+  // rent: little gold coins drifting down between the houses
+  const coin = (cx, cy) => {
+    for (const [dx, dy, c] of [[0,-1,'#b8860b'],[1,-1,'#b8860b'],[-1,0,'#b8860b'],[0,0,gold],[1,0,gold],[2,0,'#b8860b'],[-1,1,'#b8860b'],[0,1,gold],[1,1,'#fff2a8'],[2,1,'#b8860b'],[0,2,'#b8860b'],[1,2,'#b8860b']]) cv.set(cx + dx, cy + dy, c);
+  };
+  for (const [x, y] of [[40, 45], [78, 47], [116, 44], [22, 48], [138, 48], [60, 50], [98, 50]]) coin(x, y);
+  return cv;
+}
+
 const out = __dirname;
 // The classic Poon from the reference: felt blue, forest roof, golden pup, black glasses, blue plaid, lamp light.
 const classic = seedFor({ Type: 0, Body: 0, Roof: 0, Topper: 0, Glasses: 0, Eyes: 0, Mouth: 0, Shirt: 0, Item: 0, Background: 0, Smoke: 0 });
@@ -199,6 +283,7 @@ const founder = seedFor({ Body: idxOf('Body', 'Mint'), Roof: idxOf('Roof', 'Navy
   Item: idxOf('Item', 'Pons Flag'), Background: idxOf('Background', 'Sunset'), Smoke: idxOf('Smoke', 'Hearts') }) | (1n << 255n);
 console.log('founder:', JSON.stringify(A.traitLabels(A.traitsFor(founder))), A.rarity(founder).tier, A.isFounder(founder));
 poonCanvas(founder).encode(38, path.join(out, 'poon-founder.png'));
+phase1().encode(10, path.join(out, 'phase1.png'));
 pfp().encode(8, path.join(out, 'pfp.png'));
 logoWide().encode(20, path.join(out, 'logo.png'));
 cover().encode(5, path.join(out, 'cover.png'));
