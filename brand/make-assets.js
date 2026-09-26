@@ -193,6 +193,12 @@ const skeleton = seedFor({ Type: idxOf('Type', 'Skeleton'), Topper: idxOf('Toppe
   Eyes: idxOf('Eyes', 'Open'), Mouth: idxOf('Mouth', 'Grin'), Item: idxOf('Item', 'Candle'), Background: idxOf('Background', 'Arcade'), Smoke: idxOf('Smoke', 'Notes') });
 console.log('skeleton:', JSON.stringify(A.traitLabels(A.traitsFor(skeleton))), A.rarity(skeleton).tier);
 poonCanvas(skeleton).encode(38, path.join(out, 'poon-skeleton.png'));
+// A Founding Resident: a regular Poon whose buy came before graduation, so it carries the gold star badge.
+const founder = seedFor({ Body: idxOf('Body', 'Mint'), Roof: idxOf('Roof', 'Navy'), Topper: idxOf('Topper', 'Ginger Cat'),
+  Glasses: idxOf('Glasses', 'Gold Wire'), Eyes: idxOf('Eyes', 'Sparkle'), Mouth: idxOf('Mouth', 'Smile'), Shirt: idxOf('Shirt', 'Cable Knit'),
+  Item: idxOf('Item', 'Pons Flag'), Background: idxOf('Background', 'Sunset'), Smoke: idxOf('Smoke', 'Hearts') }) | (1n << 255n);
+console.log('founder:', JSON.stringify(A.traitLabels(A.traitsFor(founder))), A.rarity(founder).tier, A.isFounder(founder));
+poonCanvas(founder).encode(38, path.join(out, 'poon-founder.png'));
 pfp().encode(8, path.join(out, 'pfp.png'));
 logoWide().encode(20, path.join(out, 'logo.png'));
 cover().encode(5, path.join(out, 'cover.png'));
