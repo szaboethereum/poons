@@ -188,6 +188,11 @@ const ghost = seedFor({ Type: idxOf('Type', 'Ghost'), Topper: idxOf('Topper', 'B
   Eyes: idxOf('Eyes', 'Open'), Mouth: idxOf('Mouth', 'Surprised'), Item: idxOf('Item', 'Candle'), Background: idxOf('Background', 'Night'), Smoke: idxOf('Smoke', 'Stars') });
 console.log('ghost:', JSON.stringify(A.traitLabels(A.traitsFor(ghost))), A.rarity(ghost).tier);
 poonCanvas(ghost).encode(38, path.join(out, 'poon-ghost.png'));
+// A Skeleton: another Legendary special type, on an arcade night with a lit candle.
+const skeleton = seedFor({ Type: idxOf('Type', 'Skeleton'), Topper: idxOf('Topper', 'Tuxedo Cat'), Glasses: idxOf('Glasses', 'Shades'),
+  Eyes: idxOf('Eyes', 'Open'), Mouth: idxOf('Mouth', 'Grin'), Item: idxOf('Item', 'Candle'), Background: idxOf('Background', 'Arcade'), Smoke: idxOf('Smoke', 'Notes') });
+console.log('skeleton:', JSON.stringify(A.traitLabels(A.traitsFor(skeleton))), A.rarity(skeleton).tier);
+poonCanvas(skeleton).encode(38, path.join(out, 'poon-skeleton.png'));
 pfp().encode(8, path.join(out, 'pfp.png'));
 logoWide().encode(20, path.join(out, 'logo.png'));
 cover().encode(5, path.join(out, 'cover.png'));
